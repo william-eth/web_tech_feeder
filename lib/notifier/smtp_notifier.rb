@@ -2,7 +2,6 @@
 
 require "mail"
 require "erb"
-require "base64"
 require "google/apis/gmail_v1"
 require "googleauth"
 
@@ -26,12 +25,18 @@ module WebTechFeeder
         html_body = render_template(digest_data)
         subject = build_subject
 
-        logger.info("Sending digest email to #{config.email_to}")
+        from_addr = config.email_from.to_s.strip
+        to_addr = config.email_to.to_s.strip
+        raise ArgumentError, "EMAIL_TO is required and cannot be blank" if to_addr.empty?
+        raise ArgumentError, "EMAIL_FROM is required and cannot be blank" if from_addr.empty?
 
-        mail = build_mail(html_body, subject)
-        raw_rfc2822 = mail.to_s
-        raw_base64url = Base64.urlsafe_encode64(raw_rfc2822)
+        logger.info("Sending digest email to #{to_addr}")
 
+        mail = build_mail(html_body, subject, from_addr, to_addr)
+        raw_rfc2822 = mail.encoded
+        raw_rfc2822 = raw_rfc2822.gsub(/\r?\n/, "\r\n") unless raw_rfc2822.include?("\r\n")
+
+        # Pass raw RFC 2822 string; google-apis-gmail_v1 encodes it to base64url automatically
         credentials = Google::Auth::UserRefreshCredentials.new(
           client_id: config.gmail_client_id,
           client_secret: config.gmail_client_secret,
@@ -43,7 +48,7 @@ module WebTechFeeder
         service = Google::Apis::GmailV1::GmailService.new
         service.authorization = credentials
 
-        message = Google::Apis::GmailV1::Message.new(raw: raw_base64url)
+        message = Google::Apis::GmailV1::Message.new(raw: raw_rfc2822)
         service.send_user_message("me", message)
 
         logger.info("Digest email sent successfully")
@@ -54,12 +59,16 @@ module WebTechFeeder
 
       private
 
-      def build_mail(html_body, subject)
-        cfg = config
+      def build_mail(html_body, subject, from_addr, to_addr)
         Mail.new do
-          from    cfg.email_from
-          to      cfg.email_to
+          from    from_addr
+          to      to_addr
           subject subject
+
+          text_part do
+            content_type "text/plain; charset=UTF-8"
+            body "Please view this email in HTML format."
+          end
 
           html_part do
             content_type "text/html; charset=UTF-8"
