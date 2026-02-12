@@ -1,0 +1,169 @@
+frontend:
+  github_releases:
+    - owner: nodejs
+      repo: node
+      name: Node.js
+    - owner: facebook
+      repo: react
+      name: React
+    - owner: vercel
+      repo: next.js
+      name: Next.js
+
+  # Track notable issues and PRs from key repos
+  github_issues:
+    - owner: nodejs
+      repo: node
+      name: Node.js
+    - owner: facebook
+      repo: react
+      name: React
+    - owner: vercel
+      repo: next.js
+      name: Next.js
+
+  rss_feeds:
+    - url: https://nodejs.org/en/feed/blog.xml
+      name: Node.js Blog
+    - url: https://javascriptweekly.com/rss/
+      name: JavaScript Weekly
+    - url: https://nodeweekly.com/rss/
+      name: Node Weekly
+
+  github_advisories:
+    ecosystem: npm
+    packages: [node, react, next]
+
+backend:
+  github_releases:
+    - owner: ruby
+      repo: ruby
+      name: Ruby
+    - owner: rails
+      repo: rails
+      name: Ruby on Rails
+    # Key gem releases are also tracked via GitHub
+    - owner: ged
+      repo: ruby-pg
+      name: pg (PostgreSQL)
+    - owner: puma
+      repo: puma
+      name: Puma
+    - owner: redis
+      repo: redis-rb
+      name: redis-rb
+    - owner: lostisland
+      repo: faraday
+      name: Faraday
+    - owner: sidekiq
+      repo: sidekiq
+      name: Sidekiq
+    - owner: jwt
+      repo: ruby-jwt
+      name: ruby-jwt
+
+  github_issues:
+    - owner: ruby
+      repo: ruby
+      name: Ruby
+    - owner: rails
+      repo: rails
+      name: Ruby on Rails
+    - owner: ged
+      repo: ruby-pg
+      name: pg (PostgreSQL)
+    - owner: puma
+      repo: puma
+      name: Puma
+    - owner: redis
+      repo: redis-rb
+      name: redis-rb
+    - owner: lostisland
+      repo: faraday
+      name: Faraday
+    - owner: sidekiq
+      repo: sidekiq
+      name: Sidekiq
+    - owner: jwt
+      repo: ruby-jwt
+      name: ruby-jwt
+
+  rubygems:
+    - pg
+    - puma
+    - redis
+    - faraday
+    - sidekiq
+    - jwt
+
+  rss_feeds:
+    # Ruby official news (releases, security advisories, announcements)
+    - url: https://www.ruby-lang.org/en/feeds/news.rss
+      name: Ruby Official News
+    # Ruby Redmine issue tracker (recent discussions and bug reports)
+    - url: https://bugs.ruby-lang.org/issues.atom
+      name: Ruby Issue Tracker (Redmine)
+    # Rails official blog (This Week in Rails, release notes)
+    - url: https://rubyonrails.org/feed.xml
+      name: Rails Official Blog
+    - url: https://rubyweekly.com/rss/
+      name: Ruby Weekly
+
+  github_advisories:
+    ecosystem: rubygems
+    packages: [pg, puma, redis, faraday, sidekiq, jwt, rails, rake, bundler]
+
+devops:
+  github_releases:
+    - owner: docker-library
+      repo: ruby
+      name: Docker Ruby
+    - owner: nginx
+      repo: nginx
+      name: Nginx
+    - owner: gitlabhq
+      repo: gitlabhq
+      name: GitLab
+    - owner: kubernetes
+      repo: kubernetes
+      name: Kubernetes
+    - owner: hashicorp
+      repo: terraform
+      name: Terraform
+    - owner: opentofu
+      repo: opentofu
+      name: OpenTofu
+    - owner: awslabs
+      repo: amazon-eks-ami
+      name: Amazon EKS AMI
+
+  github_issues:
+    - owner: docker-library
+      repo: ruby
+      name: Docker Ruby
+    - owner: nginx
+      repo: nginx
+      name: Nginx
+    - owner: kubernetes
+      repo: kubernetes
+      name: Kubernetes
+    - owner: hashicorp
+      repo: terraform
+      name: Terraform
+    - owner: opentofu
+      repo: opentofu
+      name: OpenTofu
+    - owner: awslabs
+      repo: amazon-eks-ami
+      name: Amazon EKS AMI
+
+  rss_feeds:
+    # GitLab blog covers all posts; atom.xml includes release announcements
+    - url: https://about.gitlab.com/atom.xml
+      name: GitLab Blog & Releases
+    - url: https://aws.amazon.com/blogs/aws/feed/
+      name: AWS News Blog
+    - url: https://aws.amazon.com/blogs/security/feed/
+      name: AWS Security Blog
+    - url: https://kubernetes.io/feed.xml
+      name: Kubernetes Blog
