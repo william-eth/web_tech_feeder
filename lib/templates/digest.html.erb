@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>每週技術新知摘要</title>
+  <style>
+    /* Reset */
+    body, table, td, p, a, li { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    body { margin: 0; padding: 0; width: 100% !important; }
+
+    /* Base */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 15px;
+      line-height: 1.6;
+      color: #2d3748;
+      background-color: #f7fafc;
+    }
+
+    .wrapper {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    /* Header */
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      padding: 32px 28px;
+      border-radius: 12px 12px 0 0;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0 0 8px 0;
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .header .date-range {
+      font-size: 14px;
+      opacity: 0.9;
+      margin: 0;
+    }
+    .header .item-count {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-top: 12px;
+    }
+
+    /* Content */
+    .content {
+      background: #ffffff;
+      padding: 0;
+      border-radius: 0 0 12px 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+    }
+
+    /* Section */
+    .section {
+      padding: 24px 28px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+    .section:last-child {
+      border-bottom: none;
+    }
+    .section-header {
+      margin-bottom: 18px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #edf2f7;
+    }
+    .section-icon {
+      font-size: 20px;
+      margin-right: 8px;
+    }
+    .section-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1a202c;
+      margin: 0;
+      display: inline;
+    }
+    .section-count {
+      font-size: 13px;
+      color: #a0aec0;
+      margin-left: 8px;
+    }
+    .subsection-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #718096;
+      margin: 14px 0 8px 0;
+    }
+    .subsection-title:first-of-type { margin-top: 0; }
+
+    /* Category colors */
+    .section-frontend .section-title { color: #3182ce; }
+    .section-frontend .section-header { border-bottom-color: #bee3f8; }
+    .section-backend .section-title { color: #c53030; }
+    .section-backend .section-header { border-bottom-color: #fed7d7; }
+    .section-devops .section-title { color: #2f855a; }
+    .section-devops .section-header { border-bottom-color: #c6f6d5; }
+
+    /* Item */
+    .item {
+      margin-bottom: 14px;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: #f7fafc;
+      border-left: 4px solid #e2e8f0;
+    }
+    .item:last-child { margin-bottom: 0; }
+
+    .item-critical { border-left-color: #e53e3e; background: #fff5f5; }
+    .item-high { border-left-color: #ed8936; background: #fffaf0; }
+    .item-medium { border-left-color: #3182ce; background: #ebf8ff; }
+    .item-low { border-left-color: #a0aec0; }
+
+    .item-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #1a202c;
+      margin: 0 0 4px 0;
+      line-height: 1.4;
+    }
+    .item-title a {
+      color: #2b6cb0;
+      text-decoration: none;
+    }
+    .item-title a:hover {
+      text-decoration: underline;
+    }
+
+    .importance-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+    .badge-critical { background: #fed7d7; color: #c53030; }
+    .badge-high { background: #feebc8; color: #c05621; }
+    .badge-medium { background: #bee3f8; color: #2b6cb0; }
+    .badge-low { background: #e2e8f0; color: #718096; }
+
+    .item-summary {
+      font-size: 13px;
+      color: #4a5568;
+      margin: 0 0 6px 0;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+    .summary-part {
+      margin-bottom: 6px;
+    }
+    .summary-part:last-child { margin-bottom: 0; }
+    .summary-part-label {
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 2px;
+    }
+    .item-source {
+      font-size: 11px;
+      color: #a0aec0;
+      margin: 0;
+    }
+    .item-source a {
+      color: #718096;
+      text-decoration: none;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 20px;
+      color: #a0aec0;
+      font-style: italic;
+    }
+
+    /* Footer */
+    .footer {
+      text-align: center;
+      padding: 20px;
+      font-size: 12px;
+      color: #a0aec0;
+    }
+    .footer a { color: #718096; }
+
+    /* Responsive */
+    @media only screen and (max-width: 600px) {
+      .wrapper { padding: 10px; }
+      .header { padding: 24px 20px; }
+      .header h1 { font-size: 22px; }
+      .section { padding: 18px 16px; }
+      .item { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <!-- Header -->
+    <div class="header">
+      <h1>&#128218; 每週技術新知摘要</h1>
+      <p class="date-range"><%= date_range %></p>
+      <span class="item-count">共 <%= total_items %> 則更新</span>
+    </div>
+
+    <!-- Content -->
+    <div class="content">
+      <% categories = [
+        { key: :frontend, css: "section-frontend", icon: "&#127758;", fallback_title: "前端技術動態" },
+        { key: :backend, css: "section-backend", icon: "&#9881;&#65039;", fallback_title: "後端技術動態" },
+        { key: :devops, css: "section-devops", icon: "&#9729;&#65039;", fallback_title: "DevOps 相關資訊" }
+      ] %>
+
+      <% categories.each do |cat| %>
+        <% section = digest_data[cat[:key]] %>
+        <% next unless section %>
+        <% release_items = section[:release_items] || [] %>
+        <% other_items = section[:other_items] || [] %>
+        <% item_count = release_items.size + other_items.size %>
+        <% item_count = (section[:items]&.size || 0) if item_count.zero? %>
+        <div class="section <%= cat[:css] %>">
+          <div class="section-header">
+            <span class="section-icon"><%= cat[:icon] %></span>
+            <h2 class="section-title"><%= section[:section_title] || cat[:fallback_title] %></h2>
+            <span class="section-count">(<%= item_count %> 則)</span>
+          </div>
+
+          <% if item_count.zero? %>
+            <div class="empty-state">本週暫無相關更新</div>
+          <% else %>
+            <% [[ "版本釋出", release_items, true ], [ "其他動態", other_items, release_items.any? ]].each do |title, items, show_title| %>
+              <% next if items.empty? %>
+              <% if show_title %><h3 class="subsection-title"><%= title %></h3><% end %>
+              <% items.each do |item| %>
+                <% importance = (item[:importance] || "medium").downcase %>
+                <div class="item item-<%= importance %>">
+                  <p class="item-title">
+                    <% if item[:source_url] && !item[:source_url].to_s.empty? %>
+                      <a href="<%= item[:source_url] %>"><%= truncate_text(item[:title].to_s, 120) %></a>
+                    <% else %>
+                      <%= truncate_text(item[:title].to_s, 120) %>
+                    <% end %>
+                    <span class="importance-badge badge-<%= importance %>"><%= importance_label(importance) %></span>
+                  </p>
+                  <div class="item-summary">
+                    <% summary_parts(item[:summary]).each do |label, content| %>
+                      <% next if content.to_s.strip.empty? %>
+                      <div class="summary-part">
+                        <% if label %>
+                          <div class="summary-part-label"><%= label %></div>
+                          <div><%= truncate_text(content.to_s, 200) %></div>
+                        <% else %>
+                          <div><%= truncate_text(content.to_s, 300) %></div>
+                        <% end %>
+                      </div>
+                    <% end %>
+                  </div>
+                  <p class="item-source">
+                    &#128279;
+                    <% if item[:source_url] && !item[:source_url].to_s.empty? %>
+                      <a href="<%= item[:source_url] %>"><%= item[:source_name] || shorten_url(item[:source_url].to_s) %></a>
+                    <% else %>
+                      <%= item[:source_name] || "Unknown" %>
+                    <% end %>
+                  </p>
+                </div>
+              <% end %>
+            <% end %>
+          <% end %>
+        </div>
+      <% end %>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>
+        此信件由 <a href="https://github.com/william-eth/web_tech_feeder">Web Tech Feeder</a> 自動產生<br>
+        由 AI 協助摘要整理，僅供參考
+      </p>
+    </div>
+  </div>
+</body>
+</html>
