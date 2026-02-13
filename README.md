@@ -40,7 +40,7 @@ flowchart LR
 
 1. **Trigger**: GitHub Actions runs every Monday 08:00 (UTC+8)
 2. **Collect**: Ruby collectors fetch from GitHub Releases, Issues/PRs, RSS, RubyGems, GitHub Advisories
-3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 核心重點 / 🔍 技術細節 / 📊 建議動作, 2–4 sentences each for substantive detail)
+3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 Core point / 🔍 Technical details / 📊 Recommended actions, 2–4 sentences each)
 4. **Notify**: HTML email via Gmail API (OAuth 2.0 refresh token); supports dry-run preview to `tmp/digest_preview.html`
 
 ## Data Sources
@@ -111,6 +111,7 @@ GMAIL_CLIENT_SECRET=xxxx
 GMAIL_REFRESH_TOKEN=xxxx
 EMAIL_FROM=your_email@gmail.com
 EMAIL_TO=recipient@example.com
+# Multiple: EMAIL_TO=user1@example.com, user2@example.com
 ```
 
 To obtain the refresh token: create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials), then use [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/) with scope `https://www.googleapis.com/auth/gmail.send`.
@@ -129,11 +130,15 @@ bundle exec ruby bin/generate_digest
 
 Add secrets in `Settings > Secrets and variables > Actions`:
 
-**必填：** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `EMAIL_FROM`, `EMAIL_TO`  
-**AI（擇一）：** Gemini: `GEMINI_API_KEY` ｜ OpenAI: `AI_PROVIDER`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`  
-**選填：** `GH_PAT_TOKEN`（提高 GitHub API 額度；勿建立 `GITHUB_TOKEN`，該名稱為保留字）
+**Required:** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `EMAIL_FROM`, `EMAIL_TO` (comma/semicolon separated for multiple)  
+**AI (choose one):** Gemini: `GEMINI_API_KEY` ｜ OpenAI: `AI_PROVIDER`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`  
+**Optional:** `GH_PAT_TOKEN` (higher GitHub API rate limits; do not create `GITHUB_TOKEN`, that name is reserved)
 
-每週一 08:00 (UTC+8) 排程執行；可於 **Actions** 分頁手動觸發。
+Runs every Monday 08:00 (UTC+8); can be triggered manually from the **Actions** tab.
+
+## Documentation
+
+See [docs/](docs/) for setup guides and contributing guidelines.
 
 ## Project Structure
 
@@ -144,6 +149,7 @@ web_tech_feeder/
 ├── .rubocop.yml
 ├── .ruby-version
 ├── CHANGELOG.md
+├── docs/                     # Documentation
 ├── lib/
 │   ├── web_tech_feeder.rb       # Orchestrator
 │   ├── config.rb                # Config loader

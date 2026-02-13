@@ -26,13 +26,13 @@ module WebTechFeeder
         subject = build_subject
 
         from_addr = config.email_from.to_s.strip
-        to_addr = config.email_to.to_s.strip
-        raise ArgumentError, "EMAIL_TO is required and cannot be blank" if to_addr.empty?
+        to_addrs = parse_email_list(config.email_to)
+        raise ArgumentError, "EMAIL_TO is required and cannot be blank" if to_addrs.empty?
         raise ArgumentError, "EMAIL_FROM is required and cannot be blank" if from_addr.empty?
 
-        logger.info("Sending digest email to #{to_addr}")
+        logger.info("Sending digest email to #{to_addrs.join(', ')}")
 
-        mail = build_mail(html_body, subject, from_addr, to_addr)
+        mail = build_mail(html_body, subject, from_addr, to_addrs)
         raw_rfc2822 = mail.encoded
         raw_rfc2822 = raw_rfc2822.gsub(/\r?\n/, "\r\n") unless raw_rfc2822.include?("\r\n")
 
@@ -59,10 +59,16 @@ module WebTechFeeder
 
       private
 
-      def build_mail(html_body, subject, from_addr, to_addr)
+      # Parse EMAIL_TO: comma or semicolon separated, supports multiple addresses
+      def parse_email_list(raw)
+        raw.to_s.split(/[,;]/).map(&:strip).reject(&:empty?)
+      end
+
+      def build_mail(html_body, subject, from_addr, to_addrs)
+        to_value = to_addrs.is_a?(Array) ? to_addrs : [to_addrs].compact
         Mail.new do
           from    from_addr
-          to      to_addr
+          to      to_value
           subject subject
 
           text_part do
