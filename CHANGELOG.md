@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-02-14
+
+### Added
+
+- `docs/` folder: CONTRIBUTING, PLAN, GMAIL_OAUTH_SETUP, GITHUB_ACTIONS, PROMPT_GUIDELINES, SECURITY
+- `SECURITY.md` in root for vulnerability reporting
+- Multiple recipients for `EMAIL_TO` (comma or semicolon separated)
+
+### Changed
+
+- All docs and README translated to English
+
 ## [0.1.1] - 2026-02-14
 
 ### Added
@@ -46,6 +58,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/william-eth/web_tech_feeder/compare/a4d0ccd...v0.1.0
