@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-02-14
+
+### Added
+
+- DevOps GitHub Advisories: Go ecosystem (containerd, runc, Kubernetes, Terraform, Docker CLI)
+- Framework/package badge for "其他動態" items to clarify which framework/language/package each item relates to
+
+### Changed
+
+- **Prompt**: More detailed summary structure (2-4 sentences per block for 核心重點 / 技術細節 / 建議動作)
+- **Prompt**: Release blocks must list 2-3 concrete developer-facing items
+- **Prompt**: PR/Issue summaries focus on problem, debate/controversy, and final conclusion
+- **Prompt**: Always highlight API/function changes (input/output, deprecated, sunset)
+- **Prompt**: Add `framework_or_package` field for advisory/issue/other items
+- **GitHub Actions**: `GITHUB_TOKEN` fallback to `github.token` when `GH_PAT_TOKEN` not set
+- **GitHub Actions**: `AI_PROVIDER` default to `gemini` when not set
+- **README**: Update clone URL, project structure, DevOps security sources
+
 ## [0.1.0] - 2026-02-13
 
 ### Added
@@ -28,5 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/william-eth/web_tech_feeder/compare/a4d0ccd...v0.1.0

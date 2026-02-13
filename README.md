@@ -40,7 +40,7 @@ flowchart LR
 
 1. **Trigger**: GitHub Actions runs every Monday 08:00 (UTC+8)
 2. **Collect**: Ruby collectors fetch from GitHub Releases, Issues/PRs, RSS, RubyGems, GitHub Advisories
-3. **Process**: AI summarizes and categorizes into frontend/backend/devops with fixed structure (📌 核心重點 / 🔍 技術細節 / 📊 建議動作)
+3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 核心重點 / 🔍 技術細節 / 📊 建議動作, 2–4 sentences each for substantive detail)
 4. **Notify**: HTML email via Gmail API (OAuth 2.0 refresh token); supports dry-run preview to `tmp/digest_preview.html`
 
 ## Data Sources
@@ -62,20 +62,21 @@ flowchart LR
 - **Releases**: Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
 - **Issues/PRs**: Community discussions from above repos
 - **RSS**: GitLab Blog, AWS News, AWS Security, Kubernetes Blog
+- **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, Docker CLI)
 
 ## Prerequisites
 
 - Ruby 3.4.8
 - **AI**: [Gemini API Key](https://aistudio.google.com/apikey) (default) **or** OpenAI-compatible API (OpenRouter, Groq, Ollama, OpenAI)
 - **Email**: Gmail with OAuth 2.0 (Client ID, Client Secret, Refresh Token)
-- (Optional) [GitHub Token](https://github.com/settings/tokens) for higher rate limits
+- (Optional) [GitHub Token](https://github.com/settings/tokens) for higher API rate limits
 
 ## Setup
 
 ### 1. Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/web_tech_feeder.git
+git clone https://github.com/william-eth/web_tech_feeder.git
 cd web_tech_feeder
 bundle install
 ```
@@ -128,15 +129,11 @@ bundle exec ruby bin/generate_digest
 
 Add secrets in `Settings > Secrets and variables > Actions`:
 
-**Required (all):** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `EMAIL_FROM`, `EMAIL_TO`
+**必填：** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `EMAIL_FROM`, `EMAIL_TO`  
+**AI（擇一）：** Gemini: `GEMINI_API_KEY` ｜ OpenAI: `AI_PROVIDER`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`  
+**選填：** `GH_PAT_TOKEN`（提高 GitHub API 額度；勿建立 `GITHUB_TOKEN`，該名稱為保留字）
 
-**AI (choose one):**
-- Gemini: `GEMINI_API_KEY`
-- OpenAI/OpenRouter: `AI_PROVIDER=openai`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`
-
-**Optional:** `GH_PAT_TOKEN` (higher GitHub rate limits)
-
-Workflow runs Monday 08:00 (UTC+8). Manual trigger via **Actions** tab.
+每週一 08:00 (UTC+8) 排程執行；可於 **Actions** 分頁手動觸發。
 
 ## Project Structure
 
@@ -144,6 +141,9 @@ Workflow runs Monday 08:00 (UTC+8). Manual trigger via **Actions** tab.
 web_tech_feeder/
 ├── .github/workflows/
 │   └── weekly_digest.yml
+├── .rubocop.yml
+├── .ruby-version
+├── CHANGELOG.md
 ├── lib/
 │   ├── web_tech_feeder.rb       # Orchestrator
 │   ├── config.rb                # Config loader
@@ -167,8 +167,7 @@ web_tech_feeder/
 │       └── digest.html.erb
 ├── bin/generate_digest
 ├── Gemfile
-├── .env.example
-└── .ruby-version
+└── .env.example
 ```
 
 ## Configuration

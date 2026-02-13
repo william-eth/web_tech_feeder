@@ -28,8 +28,9 @@ jobs:
       - name: Generate and send weekly digest
         env:
           CI: true
-          GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN }}
-          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          # Use GH_PAT_TOKEN for higher rate limits; falls back to default GITHUB_TOKEN if not set
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN || github.token }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER || 'gemini' }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           AI_API_URL: ${{ secrets.AI_API_URL }}
           AI_API_KEY: ${{ secrets.AI_API_KEY }}
