@@ -177,6 +177,18 @@
       text-decoration: none;
     }
 
+    .framework-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #e2e8f0;
+      color: #4a5568;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
     /* Empty state */
     .empty-state {
       text-align: center;
@@ -238,13 +250,16 @@
           <% if item_count.zero? %>
             <div class="empty-state">本週暫無相關更新</div>
           <% else %>
-            <% [[ "版本釋出", release_items, true ], [ "其他動態", other_items, release_items.any? ]].each do |title, items, show_title| %>
+            <% [[ "版本釋出", release_items, true ], [ "其他動態", other_items, release_items.any? ]].each do |subsection_title, items, show_title| %>
               <% next if items.empty? %>
-              <% if show_title %><h3 class="subsection-title"><%= title %></h3><% end %>
+              <% if show_title %><h3 class="subsection-title"><%= subsection_title %></h3><% end %>
               <% items.each do |item| %>
                 <% importance = (item[:importance] || "medium").downcase %>
+                <% fw = item[:framework_or_package].to_s.strip %>
+                <% show_fw_badge = !fw.empty? && subsection_title == "其他動態" %>
                 <div class="item item-<%= importance %>">
                   <p class="item-title">
+                    <% if show_fw_badge %><span class="framework-badge"><%= fw %></span><% end %>
                     <% if item[:source_url] && !item[:source_url].to_s.empty? %>
                       <a href="<%= item[:source_url] %>"><%= truncate_text(item[:title].to_s, 120) %></a>
                     <% else %>

@@ -167,3 +167,7 @@ devops:
       name: AWS Security Blog
     - url: https://kubernetes.io/feed.xml
       name: Kubernetes Blog
+
+  github_advisories:
+    ecosystem: go
+    packages: [github.com/containerd/containerd, github.com/opencontainers/runc, k8s.io/kubernetes, github.com/hashicorp/terraform, github.com/docker/cli]
