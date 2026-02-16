@@ -35,6 +35,11 @@ module WebTechFeeder
 
         mail = build_mail(html_body, subject, from_addr, to_addrs, bcc_addrs)
         raw_rfc2822 = mail.encoded
+        # Mail gem omits Bcc from encoded output by default. Gmail API requires Bcc in the
+        # raw payload to deliver; inject the header before the body (first \r\n\r\n).
+        if bcc_addrs.any?
+          raw_rfc2822 = raw_rfc2822.sub(/\r?\n\r?\n/, "\r\nBcc: #{bcc_addrs.join(', ')}\r\n\r\n")
+        end
         raw_rfc2822 = raw_rfc2822.gsub(/\r?\n/, "\r\n") unless raw_rfc2822.include?("\r\n")
 
         # Pass raw RFC 2822 string; google-apis-gmail_v1 encodes it to base64url automatically
@@ -71,7 +76,7 @@ module WebTechFeeder
         Mail.new do
           from    from_addr
           to      to_value
-          bcc    bcc_value if bcc_value
+          bcc     bcc_value if bcc_value
           subject subject
 
           text_part do
