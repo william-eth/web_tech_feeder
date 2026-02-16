@@ -30,6 +30,7 @@ Add these in `Settings > Secrets and variables > Actions`:
 | Secret | Description |
 |--------|-------------|
 | `GH_PAT_TOKEN` | GitHub Personal Access Token for higher API rate limits (5000/hr vs 60/hr) |
+| `EMAIL_BCC` | BCC recipients (comma or semicolon separated) |
 
 > **Note**: Do not create a secret named `GITHUB_TOKEN` (reserved by GitHub). The workflow uses `GH_PAT_TOKEN` and falls back to `github.token` when unset.
 
