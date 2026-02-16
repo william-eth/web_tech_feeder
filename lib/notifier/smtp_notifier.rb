@@ -30,9 +30,10 @@ module WebTechFeeder
         raise ArgumentError, "EMAIL_TO is required and cannot be blank" if to_addrs.empty?
         raise ArgumentError, "EMAIL_FROM is required and cannot be blank" if from_addr.empty?
 
-        logger.info("Sending digest email to #{to_addrs.join(', ')}")
+        bcc_addrs = parse_email_list(config.email_bcc)
+        logger.info("Sending digest email to #{to_addrs.join(', ')}#{bcc_addrs.any? ? " bcc #{bcc_addrs.join(', ')}" : ''}")
 
-        mail = build_mail(html_body, subject, from_addr, to_addrs)
+        mail = build_mail(html_body, subject, from_addr, to_addrs, bcc_addrs)
         raw_rfc2822 = mail.encoded
         raw_rfc2822 = raw_rfc2822.gsub(/\r?\n/, "\r\n") unless raw_rfc2822.include?("\r\n")
 
@@ -64,11 +65,13 @@ module WebTechFeeder
         raw.to_s.split(/[,;]/).map(&:strip).reject(&:empty?)
       end
 
-      def build_mail(html_body, subject, from_addr, to_addrs)
+      def build_mail(html_body, subject, from_addr, to_addrs, bcc_addrs = [])
         to_value = to_addrs.is_a?(Array) ? to_addrs : [to_addrs].compact
+        bcc_value = bcc_addrs.is_a?(Array) && bcc_addrs.any? ? bcc_addrs : nil
         Mail.new do
           from    from_addr
           to      to_value
+          bcc    bcc_value if bcc_value
           subject subject
 
           text_part do

@@ -3,6 +3,9 @@ frontend:
     - owner: nodejs
       repo: node
       name: Node.js
+    - owner: microsoft
+      repo: TypeScript
+      name: TypeScript
     - owner: facebook
       repo: react
       name: React
@@ -15,6 +18,9 @@ frontend:
     - owner: nodejs
       repo: node
       name: Node.js
+    - owner: microsoft
+      repo: TypeScript
+      name: TypeScript
     - owner: facebook
       repo: react
       name: React
@@ -25,6 +31,9 @@ frontend:
   rss_feeds:
     - url: https://nodejs.org/en/feed/blog.xml
       name: Node.js Blog
+    # Official Node.js security vulnerability advisories
+    - url: https://nodejs.org/en/feed/vulnerability.xml
+      name: Node.js Security Advisories
     - url: https://javascriptweekly.com/rss/
       name: JavaScript Weekly
     - url: https://nodeweekly.com/rss/
@@ -32,10 +41,13 @@ frontend:
 
   github_advisories:
     ecosystem: npm
-    packages: [node, react, next]
+    packages: [node, react, next, typescript]
 
 backend:
   github_releases:
+    - owner: golang
+      repo: go
+      name: Go
     - owner: ruby
       repo: ruby
       name: Ruby
@@ -61,8 +73,17 @@ backend:
     - owner: jwt
       repo: ruby-jwt
       name: ruby-jwt
+    - owner: doorkeeper-gem
+      repo: doorkeeper
+      name: Doorkeeper
+    - owner: heartcombo
+      repo: devise
+      name: Devise
 
   github_issues:
+    - owner: golang
+      repo: go
+      name: Go
     - owner: ruby
       repo: ruby
       name: Ruby
@@ -87,6 +108,12 @@ backend:
     - owner: jwt
       repo: ruby-jwt
       name: ruby-jwt
+    - owner: doorkeeper-gem
+      repo: doorkeeper
+      name: Doorkeeper
+    - owner: heartcombo
+      repo: devise
+      name: Devise
 
   rubygems:
     - pg
@@ -95,11 +122,19 @@ backend:
     - faraday
     - sidekiq
     - jwt
+    - doorkeeper
+    - devise
 
   rss_feeds:
+    # Official Go blog (releases, language features, tooling)
+    - url: https://go.dev/blog/feed.atom
+      name: The Go Blog
     # Ruby official news (releases, security advisories, announcements)
     - url: https://www.ruby-lang.org/en/feeds/news.rss
       name: Ruby Official News
+    # Official Rails security announcements (low-traffic, embargo-safe)
+    - url: https://discuss.rubyonrails.org/c/security-announcements/9.rss
+      name: Rails Security Announcements
     # Ruby Redmine issue tracker (recent discussions and bug reports)
     - url: https://bugs.ruby-lang.org/issues.atom
       name: Ruby Issue Tracker (Redmine)
@@ -111,10 +146,30 @@ backend:
 
   github_advisories:
     ecosystem: rubygems
-    packages: [pg, puma, redis, faraday, sidekiq, jwt, rails, rake, bundler]
+    packages: [pg, puma, redis, faraday, sidekiq, jwt, doorkeeper, devise, rails, rake, bundler]
 
 devops:
   github_releases:
+    # Database/cache servers (distinct from backend pg gem / redis-rb client)
+    # PostgreSQL: uses Planet PostgreSQL RSS; no GitHub Releases
+    - owner: redis
+      repo: redis
+      name: Redis (server)
+    - owner: helm
+      repo: helm
+      name: Helm
+    - owner: grafana
+      repo: grafana
+      name: Grafana
+    - owner: argoproj
+      repo: argo-cd
+      name: ArgoCD
+    - owner: moby
+      repo: moby
+      name: Docker Engine
+    - owner: stakater
+      repo: Reloader
+      name: Reloader
     - owner: docker-library
       repo: ruby
       name: Docker Ruby
@@ -138,6 +193,24 @@ devops:
       name: Amazon EKS AMI
 
   github_issues:
+    - owner: redis
+      repo: redis
+      name: Redis (server)
+    - owner: helm
+      repo: helm
+      name: Helm
+    - owner: grafana
+      repo: grafana
+      name: Grafana
+    - owner: argoproj
+      repo: argo-cd
+      name: ArgoCD
+    - owner: moby
+      repo: moby
+      name: Docker Engine
+    - owner: stakater
+      repo: Reloader
+      name: Reloader
     - owner: docker-library
       repo: ruby
       name: Docker Ruby
@@ -158,9 +231,21 @@ devops:
       name: Amazon EKS AMI
 
   rss_feeds:
+    # PostgreSQL community news (includes official release announcements)
+    - url: https://planet.postgresql.org/rss20.xml
+      name: PostgreSQL News & Releases
+    # AWS EKS Kubernetes version lifecycle (doc changes = version/support updates)
+    - url: https://github.com/awsdocs/amazon-eks-user-guide/commits/mainline/latest/ug/versioning/kubernetes-versions.adoc.atom
+      name: Amazon EKS Kubernetes Versions (doc updates)
     # GitLab blog covers all posts; atom.xml includes release announcements
     - url: https://about.gitlab.com/atom.xml
       name: GitLab Blog & Releases
+    # Official Kubernetes CVE feed (Kubernetes Security Response Committee)
+    - url: https://kubernetes.io/docs/reference/issues-security/official-cve-feed/feed.xml
+      name: Kubernetes Official CVE Feed
+    # HashiCorp security bulletins (Terraform, Vault, Consul, Nomad, etc.)
+    - url: https://discuss.hashicorp.com/c/security/52.rss
+      name: HashiCorp Security Bulletins
     - url: https://aws.amazon.com/blogs/aws/feed/
       name: AWS News Blog
     - url: https://aws.amazon.com/blogs/security/feed/

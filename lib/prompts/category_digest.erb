@@ -37,9 +37,13 @@ CONTENT-TYPE SPECIFIC GUIDELINES:
 FRAMEWORK/PACKAGE TAGGING:
 - For item_type "advisory", "issue", "other", ALWAYS set "framework_or_package" to the primary framework, language, or package (e.g. "Rails", "Node.js", "puma", "Kubernetes"). For "release", include when it aids clarity (e.g. same category has multiple projects).
 
+<% if section_title == "後端技術動態" %>
+BACKEND-SPECIFIC (後端技術動態): This section is Ruby-centric. Go content: include ONLY (1) major/significant items (major version release, breaking change, important new feature) or (2) security-related (advisory, CVE, vulnerability). Skip minor Go patch releases, routine Go blog posts, and trivial Go issues. Prioritize Ruby, Rails, and Ruby gems.
+<% end %>
+
 IMPORTANT RULES - BE SUBSTANTIVE:
 1. Include critical (security), high (releases), AND MUST include 1-2 items from GitHub Issues/PRs or RSS/Blog when available in RAW DATA. PR/Issue and Blog provide community insights - never omit them entirely when raw data contains such sources. Mark notable discussions and informative posts as "high".
-2. Output 4-5 items for THIS category when sufficient material exists. EACH category is processed separately - frontend/backend/devops each get up to 5. Balance: releases + advisories + at least 1-2 from Issue/PR or Blog.
+2. Output up to 7 items for THIS category when sufficient material exists. EACH category is processed separately - frontend/backend/devops each get up to 7 (releases + others combined). Balance: releases + advisories + at least 1-2 from Issue/PR or Blog.
 3. Summaries: Follow the fixed structure with 2-4 sentences per block. Avoid one-liners; provide enough detail for readers to grasp the impact and next steps without opening the source link.
 4. ACCURACY: Each item's title MUST match its source. Do NOT mix up different packages.
 5. DEDUPLICATE: Same vulnerability or release from multiple sources = output ONE merged entry.

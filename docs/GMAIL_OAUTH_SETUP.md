@@ -48,6 +48,7 @@ GMAIL_CLIENT_SECRET=xxxx
 GMAIL_REFRESH_TOKEN=xxxx
 EMAIL_FROM=your_email@gmail.com   # Must match OAuth-authorized account
 EMAIL_TO=recipient@example.com   # Multiple: comma or semicolon separated
+EMAIL_BCC=archive@example.com    # Optional BCC
 ```
 
 ## 4. Multiple Recipients
@@ -56,4 +57,12 @@ EMAIL_TO=recipient@example.com   # Multiple: comma or semicolon separated
 
 ```dotenv
 EMAIL_TO=user1@example.com, user2@example.com
+```
+
+## 5. BCC (Optional)
+
+`EMAIL_BCC` is optional and supports comma or semicolon separation (same format as `EMAIL_TO`). Useful for archiving or backup copies.
+
+```dotenv
+EMAIL_BCC=archive@example.com, backup@example.com
 ```

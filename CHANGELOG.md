@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-02-16
+
+### Changed
+
+- Digest limits: each category up to 10 candidates; releases + others display capped at 7 per category; bypass 7-item cap when all items are critical/high (show up to 10)
+- Backend section: Ruby-centric; Go items only when major/significant or security-related
+- GitHub Actions: `actions/checkout@v5` → `actions/checkout@v6`
+
+### Added
+
+- Official security RSS feeds: Node.js Security Advisories, Rails Security Announcements, Kubernetes Official CVE Feed, HashiCorp Security Bulletins
+- BCC support (`EMAIL_BCC`, optional)
+- Go language in backend: GitHub releases, issues, The Go Blog (go.dev)
+- Frontend: TypeScript (releases, issues, npm advisory)
+- DevOps: PostgreSQL News & Releases (Planet PostgreSQL RSS), Redis (server), Helm, Grafana, ArgoCD, Docker Engine (moby/moby), Reloader (stakater)
+- Amazon EKS: Kubernetes version lifecycle doc feed (`amazon-eks-user-guide` commit atom for versioning page)
+- Backend: Doorkeeper, Devise (OAuth, auth gems)
+
 ## [0.1.2] - 2026-02-14
 
 ### Added
@@ -58,7 +76,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/william-eth/web_tech_feeder/compare/a4d0ccd...v0.1.0

@@ -79,6 +79,10 @@ module WebTechFeeder
       ENV.fetch("EMAIL_TO")
     end
 
+    def email_bcc
+      ENV["EMAIL_BCC"]
+    end
+
     # Dry-run mode: collect + process but skip email sending,
     # and save the HTML output to tmp/digest_preview.html instead
     def dry_run?

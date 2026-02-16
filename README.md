@@ -46,22 +46,22 @@ flowchart LR
 ## Data Sources
 
 ### Frontend
-- **Releases**: Node.js, React, Next.js (GitHub API, latest version per repo)
+- **Releases**: Node.js, TypeScript, React, Next.js (GitHub API, latest version per repo)
 - **Issues/PRs**: Community discussions from above repos
-- **RSS**: Node.js Blog, JavaScript Weekly, Node Weekly
-- **Security**: npm advisories (node, react, next)
+- **RSS**: Node.js Blog, Node.js Security Advisories, JavaScript Weekly, Node Weekly
+- **Security**: npm advisories (node, react, next, typescript)
 
 ### Backend
-- **Releases**: Ruby, Rails, pg, Puma, redis-rb, Faraday, Sidekiq, ruby-jwt
+- **Releases**: Go, Ruby, Rails, pg, Puma, redis-rb, Faraday, Sidekiq, ruby-jwt, Doorkeeper, Devise
 - **Issues/PRs**: Community discussions from above repos
-- **RubyGems**: pg, puma, redis, faraday, sidekiq, jwt
-- **RSS**: Ruby Official News, Ruby Redmine, Rails Blog, Ruby Weekly
+- **RubyGems**: pg, puma, redis, faraday, sidekiq, jwt, doorkeeper, devise
+- **RSS**: The Go Blog, Ruby Official News, Rails Security Announcements, Ruby Redmine, Rails Blog, Ruby Weekly
 - **Security**: RubyGems advisories
 
 ### DevOps
-- **Releases**: Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
+- **Releases**: Redis (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
 - **Issues/PRs**: Community discussions from above repos
-- **RSS**: GitLab Blog, AWS News, AWS Security, Kubernetes Blog
+- **RSS**: PostgreSQL News & Releases, Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, HashiCorp Security Bulletins, AWS News, AWS Security, Kubernetes Blog
 - **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, Docker CLI)
 
 ## Prerequisites
@@ -112,6 +112,7 @@ GMAIL_REFRESH_TOKEN=xxxx
 EMAIL_FROM=your_email@gmail.com
 EMAIL_TO=recipient@example.com
 # Multiple: EMAIL_TO=user1@example.com, user2@example.com
+# BCC (optional): EMAIL_BCC=archive@example.com, backup@example.com
 ```
 
 To obtain the refresh token: create OAuth 2.0 credentials in [Google Cloud Console](https://console.cloud.google.com/apis/credentials), then use [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/) with scope `https://www.googleapis.com/auth/gmail.send`.
@@ -131,6 +132,7 @@ bundle exec ruby bin/generate_digest
 Add secrets in `Settings > Secrets and variables > Actions`:
 
 **Required:** `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `EMAIL_FROM`, `EMAIL_TO` (comma/semicolon separated for multiple)  
+**Optional:** `EMAIL_BCC` (comma/semicolon separated for BCC recipients)  
 **AI (choose one):** Gemini: `GEMINI_API_KEY` ｜ OpenAI: `AI_PROVIDER`, `AI_API_URL`, `AI_API_KEY`, `AI_MODEL`  
 **Optional:** `GH_PAT_TOKEN` (higher GitHub API rate limits; do not create `GITHUB_TOKEN`, that name is reserved)
 
