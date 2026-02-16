@@ -36,6 +36,14 @@ Each item must have three blocks, separated by line breaks:
 - **Always highlight** input/output signature changes, deprecated APIs, sunset notices
 - Include specific function/method names when relevant
 
+## Category-Specific Rules
+
+### Backend (後端技術動態)
+
+- **Ruby-centric**: Prioritize Ruby, Rails, and Ruby gems
+- **Go**: Include only (1) major/significant items (major version release, breaking change, important new feature) or (2) security-related (advisory, CVE)
+- Skip: minor Go patch releases, routine Go blog posts, trivial Go issues
+
 ## Framework / Package Tagging
 
 - **advisory / issue / other**: Must set `framework_or_package` (e.g. Rails, Node.js, Kubernetes, puma)

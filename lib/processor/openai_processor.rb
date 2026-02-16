@@ -34,7 +34,7 @@ module WebTechFeeder
                        "Summaries: 📌 核心重點 + 🔍 技術細節 + 📊 建議動作. " \
                        "item_type: 'release'|'advisory'|'issue'|'other'. " \
                        "LANGUAGE: Traditional Chinese only. TECHNICAL TERMS: Keep in English. " \
-                       "Output 4-5 items per category, balanced across releases, advisories, and Issue/PR/Blog."
+                       "Output up to 7 items per category (releases + others combined), balanced across releases, advisories, and Issue/PR/Blog."
             },
             { role: "user", content: prompt }
           ],
