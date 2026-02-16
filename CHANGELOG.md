@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Prompt (category_digest)**: 技術細節必須具體說明「什麼問題、什麼情境、什麼相容性」，禁止模糊表述；建議動作不只升級版本，需含語法變更、deprecated 替換、開發者須留意事項與程式碼區塊
+- **Prompt (category_digest)**: 重構為 AI 友善格式（區塊化、表格、MUST/MUST NOT、去冗餘），提升模型解析準確度
+
+### Added
+
+- **Digest template**: `format_summary_content` 支援 ``` 程式碼區塊轉為 `<code class="summary-code">`，搭配 `.summary-code` CSS 防止跑版（`white-space: pre-wrap`, `word-break`, `overflow-x`）
+- **TemplateRenderer**: `escape_html` (CGI.escapeHTML) 防 XSS；`format_summary_content` 將 markdown 程式碼區塊轉成 HTML 並正確 escape
+
+## [0.1.4] - 2026-02-17
+
+### Fixed
+
+- BCC: Mail gem omits Bcc from encoded output by default; inject Bcc header into raw payload so Gmail API delivers to BCC recipients
+
 ## [0.1.3] - 2026-02-16
 
 ### Changed
