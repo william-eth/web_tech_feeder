@@ -186,7 +186,8 @@ web_tech_feeder/
 | `DRY_RUN` | `false` | `true` = preview only, no email |
 | `LOOKBACK_DAYS` | `7` | Days to look back |
 | `DIGEST_MIN_IMPORTANCE` | `high` | `high`, `medium`, or `low` |
-| `AI_MAX_TOKENS` | `16384` | For reasoning models |
+| `AI_MAX_TOKENS` | `16384` | Max completion/output tokens |
+| `AI_USE_MAX_COMPLETION_TOKENS` | auto | Set `true` if model rejects `max_tokens` (e.g. GPT-5.x, o1); auto-detected for `gpt-5*`, `o1-*`, `o3-*` |
 
 ### Sources
 
