@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-02-18
+
+### Fixed
+
+- **OpenAI processor**: Use `max_completion_tokens` instead of `max_tokens` for models that require it (GPT-5.x, o1, o3); fixes 400 error "Unsupported parameter: 'max_tokens'"
+
+### Added
+
+- **OpenAI processor**: Auto-detect models needing `max_completion_tokens`; `AI_USE_MAX_COMPLETION_TOKENS=true` env override for manual control
+
 ## [0.1.4] - 2026-02-17
 
 ### Fixed
@@ -92,8 +102,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.3...HEAD
-[0.1.3]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/william-eth/web_tech_feeder/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/william-eth/web_tech_feeder/compare/a4d0ccd...v0.1.0
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...HEAD
+[0.1.5]: https://github.com/william-eth/web_tech_feeder/compare/0.1.4...0.1.5
+[0.1.4]: https://github.com/william-eth/web_tech_feeder/compare/0.1.3...0.1.4
+[0.1.3]: https://github.com/william-eth/web_tech_feeder/compare/0.1.2...0.1.3
+[0.1.2]: https://github.com/william-eth/web_tech_feeder/compare/0.1.1...0.1.2
+[0.1.1]: https://github.com/william-eth/web_tech_feeder/compare/0.1.0...0.1.1
+[0.1.0]: https://github.com/william-eth/web_tech_feeder/compare/a4d0ccd...0.1.0

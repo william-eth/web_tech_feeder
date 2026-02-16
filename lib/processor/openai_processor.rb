@@ -23,24 +23,7 @@ module WebTechFeeder
         conn = build_connection
         endpoint = build_endpoint
 
-        body = {
-          model: config.ai_model,
-          messages: [
-            {
-              role: "system",
-              content: "You are a senior software engineering newsletter editor. " \
-                       "Output ONLY valid JSON. No introduction, no explanation, no text before or after. Start with { and end with }. " \
-                       "MUST include 1-2 items from GitHub Issues/PRs or RSS/Blog when available - never omit PR/Issue/Blog entirely. " \
-                       "Summaries: 📌 核心重點 + 🔍 技術細節 + 📊 建議動作. " \
-                       "item_type: 'release'|'advisory'|'issue'|'other'. " \
-                       "LANGUAGE: Traditional Chinese only. TECHNICAL TERMS: Keep in English. " \
-                       "Output up to 7 items per category (releases + others combined), balanced across releases, advisories, and Issue/PR/Blog."
-            },
-            { role: "user", content: prompt }
-          ],
-          temperature: 0.2,
-          max_tokens: config.ai_max_tokens
-        }
+        body = build_request_body(prompt)
 
         headers = { "Content-Type" => "application/json" }
         headers["Authorization"] = "Bearer #{config.ai_api_key}" if config.ai_api_key && !config.ai_api_key.empty?
@@ -78,6 +61,37 @@ module WebTechFeeder
       end
 
       private
+
+      # Some models (GPT-5.x, o1, o3) require max_completion_tokens instead of max_tokens.
+      # Set AI_USE_MAX_COMPLETION_TOKENS=true to force max_completion_tokens for any model.
+      def uses_max_completion_tokens?
+        return true if ENV["AI_USE_MAX_COMPLETION_TOKENS"]&.downcase == "true"
+        model = config.ai_model.to_s.downcase
+        model.match?(/gpt-5|o1-|o3-/)
+      end
+
+      def build_request_body(prompt)
+        base = {
+          model: config.ai_model,
+          messages: [
+            {
+              role: "system",
+              content: "You are a senior software engineering newsletter editor. " \
+                       "Output ONLY valid JSON. No introduction, no explanation, no text before or after. Start with { and end with }. " \
+                       "MUST include 1-2 items from GitHub Issues/PRs or RSS/Blog when available - never omit PR/Issue/Blog entirely. " \
+                       "Summaries: 📌 核心重點 + 🔍 技術細節 + 📊 建議動作. " \
+                       "item_type: 'release'|'advisory'|'issue'|'other'. " \
+                       "LANGUAGE: Traditional Chinese only. TECHNICAL TERMS: Keep in English. " \
+                       "Output up to 7 items per category (releases + others combined), balanced across releases, advisories, and Issue/PR/Blog."
+            },
+            { role: "user", content: prompt }
+          ],
+          temperature: 0.2
+        }
+        token_key = uses_max_completion_tokens? ? :max_completion_tokens : :max_tokens
+        base[token_key] = config.ai_max_tokens
+        base
+      end
 
       def build_endpoint
         # Ensure correct URL construction regardless of trailing slash in base URL
