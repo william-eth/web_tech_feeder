@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-02-17
+
+### Fixed
+
+- BCC: Mail gem omits Bcc from encoded output by default; inject Bcc header into raw payload so Gmail API delivers to BCC recipients
+
+### Changed
+
+- **Prompt (category_digest)**: Technical details section must state concrete problem, trigger scenario, and compatibility impact; no vague phrasing; recommended actions section must include syntax changes, deprecated replacements, developer watch items, and code blocks—not just version upgrade
+- **Prompt (category_digest)**: Restructure for AI readability (sections, table, MUST/MUST NOT, remove redundancy)
+
+### Added
+
+- **Digest template**: `format_summary_content` converts ``` code blocks to `<code class="summary-code">`; `.summary-code` CSS prevents overflow (`white-space: pre-wrap`, `word-break`, `overflow-x`)
+- **TemplateRenderer**: `escape_html` (CGI.escapeHTML) for XSS prevention; `format_summary_content` converts markdown code blocks to HTML with proper escaping
+
 ## [0.1.3] - 2026-02-16
 
 ### Changed
@@ -42,11 +58,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - DevOps GitHub Advisories: Go ecosystem (containerd, runc, Kubernetes, Terraform, Docker CLI)
-- Framework/package badge for "其他動態" items to clarify which framework/language/package each item relates to
+- Framework/package badge for "other updates" items to clarify which framework/language/package each item relates to
 
 ### Changed
 
-- **Prompt**: More detailed summary structure (2-4 sentences per block for 核心重點 / 技術細節 / 建議動作)
+- **Prompt**: More detailed summary structure (2-4 sentences per block for key points / technical details / recommended actions)
 - **Prompt**: Release blocks must list 2-3 concrete developer-facing items
 - **Prompt**: PR/Issue summaries focus on problem, debate/controversy, and final conclusion
 - **Prompt**: Always highlight API/function changes (input/output, deprecated, sunset)

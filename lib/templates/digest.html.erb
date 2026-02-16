@@ -5,232 +5,246 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>每週技術新知摘要</title>
   <style>
-    /* Reset */
     body, table, td, p, a, li { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
     body { margin: 0; padding: 0; width: 100% !important; }
 
-    /* Base */
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-      font-size: 15px;
+      font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
       line-height: 1.6;
-      color: #2d3748;
-      background-color: #f7fafc;
+      color: #334155;
+      background-color: #f1f5f9;
     }
 
     .wrapper {
-      max-width: 680px;
+      max-width: 640px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 16px;
     }
 
-    /* Header */
+    /* Header - dark technical style */
     .header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: #ffffff;
-      padding: 32px 28px;
-      border-radius: 12px 12px 0 0;
-      text-align: center;
+      background: #0f172a;
+      color: #e2e8f0;
+      padding: 24px 24px;
+      border-radius: 6px 6px 0 0;
     }
     .header h1 {
-      margin: 0 0 8px 0;
-      font-size: 26px;
-      font-weight: 700;
+      margin: 0 0 6px 0;
+      font-size: 18px;
+      font-weight: 600;
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
       letter-spacing: 0.5px;
     }
     .header .date-range {
-      font-size: 14px;
-      opacity: 0.9;
+      font-size: 12px;
+      color: #94a3b8;
       margin: 0;
     }
     .header .item-count {
       display: inline-block;
-      background: rgba(255,255,255,0.2);
-      padding: 4px 14px;
-      border-radius: 20px;
-      font-size: 13px;
-      margin-top: 12px;
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      color: #64748b;
+      background: #1e293b;
+      padding: 3px 10px;
+      border-radius: 4px;
+      margin-top: 10px;
     }
 
     /* Content */
     .content {
       background: #ffffff;
       padding: 0;
-      border-radius: 0 0 12px 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+      border-radius: 0 0 6px 6px;
+      border: 1px solid #e2e8f0;
+      border-top: none;
     }
 
     /* Section */
     .section {
-      padding: 24px 28px;
+      padding: 20px 24px;
       border-bottom: 1px solid #e2e8f0;
     }
-    .section:last-child {
-      border-bottom: none;
-    }
+    .section:last-child { border-bottom: none; }
+
     .section-header {
-      margin-bottom: 18px;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #edf2f7;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
     }
-    .section-icon {
-      font-size: 20px;
-      margin-right: 8px;
+    .section-tag {
+      font-size: 11px;
+      font-family: ui-monospace, monospace;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
     }
+    .section-frontend .section-tag { background: #dbeafe; color: #1d4ed8; }
+    .section-backend .section-tag { background: #fee2e2; color: #b91c1c; }
+    .section-devops .section-tag { background: #dcfce7; color: #15803d; }
+
     .section-title {
-      font-size: 20px;
-      font-weight: 700;
-      color: #1a202c;
+      font-size: 15px;
+      font-weight: 600;
+      color: #0f172a;
       margin: 0;
-      display: inline;
     }
     .section-count {
-      font-size: 13px;
-      color: #a0aec0;
-      margin-left: 8px;
+      font-size: 12px;
+      color: #94a3b8;
+      font-family: ui-monospace, monospace;
     }
+
     .subsection-title {
-      font-size: 14px;
+      font-size: 12px;
       font-weight: 600;
-      color: #718096;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin: 14px 0 8px 0;
     }
     .subsection-title:first-of-type { margin-top: 0; }
 
-    /* Category colors */
-    .section-frontend .section-title { color: #3182ce; }
-    .section-frontend .section-header { border-bottom-color: #bee3f8; }
-    .section-backend .section-title { color: #c53030; }
-    .section-backend .section-header { border-bottom-color: #fed7d7; }
-    .section-devops .section-title { color: #2f855a; }
-    .section-devops .section-header { border-bottom-color: #c6f6d5; }
-
-    /* Item */
+    /* Item - document/card style */
     .item {
-      margin-bottom: 14px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      background: #f7fafc;
-      border-left: 4px solid #e2e8f0;
+      margin-bottom: 12px;
+      padding: 14px 16px;
+      border-radius: 4px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 3px solid #94a3b8;
     }
     .item:last-child { margin-bottom: 0; }
 
-    .item-critical { border-left-color: #e53e3e; background: #fff5f5; }
-    .item-high { border-left-color: #ed8936; background: #fffaf0; }
-    .item-medium { border-left-color: #3182ce; background: #ebf8ff; }
-    .item-low { border-left-color: #a0aec0; }
+    .item-critical { border-left-color: #dc2626; background: #fef2f2; }
+    .item-high { border-left-color: #ea580c; background: #fff7ed; }
+    .item-medium { border-left-color: #2563eb; background: #eff6ff; }
+    .item-low { border-left-color: #94a3b8; }
 
     .item-title {
       font-size: 14px;
       font-weight: 600;
-      color: #1a202c;
-      margin: 0 0 4px 0;
+      color: #0f172a;
+      margin: 0 0 6px 0;
       line-height: 1.4;
     }
     .item-title a {
-      color: #2b6cb0;
+      color: #0369a1;
       text-decoration: none;
     }
-    .item-title a:hover {
-      text-decoration: underline;
-    }
+    .item-title a:hover { text-decoration: underline; }
 
     .importance-badge {
       display: inline-block;
       font-size: 10px;
+      font-family: ui-monospace, monospace;
       font-weight: 600;
-      padding: 1px 6px;
-      border-radius: 8px;
+      padding: 2px 6px;
+      border-radius: 3px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.3px;
       vertical-align: middle;
-      margin-left: 6px;
+      margin-left: 8px;
     }
-    .badge-critical { background: #fed7d7; color: #c53030; }
-    .badge-high { background: #feebc8; color: #c05621; }
-    .badge-medium { background: #bee3f8; color: #2b6cb0; }
-    .badge-low { background: #e2e8f0; color: #718096; }
-
-    .item-summary {
-      font-size: 13px;
-      color: #4a5568;
-      margin: 0 0 6px 0;
-      line-height: 1.5;
-      word-break: break-word;
-    }
-    .summary-part {
-      margin-bottom: 6px;
-    }
-    .summary-part:last-child { margin-bottom: 0; }
-    .summary-part-label {
-      font-weight: 600;
-      color: #4a5568;
-      margin-bottom: 2px;
-    }
-    .item-source {
-      font-size: 11px;
-      color: #a0aec0;
-      margin: 0;
-    }
-    .item-source a {
-      color: #718096;
-      text-decoration: none;
-    }
+    .badge-critical { background: #fecaca; color: #b91c1c; }
+    .badge-high { background: #fed7aa; color: #c2410c; }
+    .badge-medium { background: #bfdbfe; color: #1d4ed8; }
+    .badge-low { background: #cbd5e1; color: #475569; }
 
     .framework-badge {
       display: inline-block;
       font-size: 11px;
-      font-weight: 600;
+      font-family: ui-monospace, monospace;
+      font-weight: 500;
       padding: 2px 8px;
-      border-radius: 4px;
+      border-radius: 3px;
       background: #e2e8f0;
-      color: #4a5568;
+      color: #475569;
       margin-right: 8px;
       vertical-align: middle;
     }
 
-    /* Empty state */
+    .item-summary {
+      font-size: 13px;
+      color: #475569;
+      margin: 0 0 8px 0;
+      line-height: 1.55;
+      word-break: break-word;
+    }
+    .summary-part { margin-bottom: 8px; }
+    .summary-part:last-child { margin-bottom: 0; }
+    .summary-part-body { word-break: break-word; }
+    .summary-part-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #64748b;
+      margin-bottom: 3px;
+    }
+    .summary-code {
+      display: block;
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      padding: 10px 12px;
+      margin: 6px 0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      overflow-x: auto;
+      max-width: 100%;
+    }
+
+    .item-source {
+      font-size: 11px;
+      color: #94a3b8;
+      margin: 0;
+    }
+    .item-source a {
+      color: #64748b;
+      text-decoration: none;
+    }
+
     .empty-state {
       text-align: center;
-      padding: 20px;
-      color: #a0aec0;
-      font-style: italic;
+      padding: 24px;
+      color: #94a3b8;
+      font-size: 13px;
     }
 
     /* Footer */
     .footer {
       text-align: center;
-      padding: 20px;
-      font-size: 12px;
-      color: #a0aec0;
+      padding: 16px;
+      font-size: 11px;
+      color: #94a3b8;
     }
-    .footer a { color: #718096; }
+    .footer a { color: #64748b; }
 
-    /* Responsive */
     @media only screen and (max-width: 600px) {
-      .wrapper { padding: 10px; }
-      .header { padding: 24px 20px; }
-      .header h1 { font-size: 22px; }
-      .section { padding: 18px 16px; }
-      .item { padding: 10px; }
+      .wrapper { padding: 12px; }
+      .header { padding: 20px; }
+      .section { padding: 16px; }
+      .item { padding: 12px; }
     }
   </style>
 </head>
 <body>
   <div class="wrapper">
-    <!-- Header -->
     <div class="header">
-      <h1>&#128218; 每週技術新知摘要</h1>
+      <h1>每週技術新知摘要</h1>
       <p class="date-range"><%= date_range %></p>
-      <span class="item-count">共 <%= total_items %> 則更新</span>
+      <span class="item-count">共 <%= total_items %> 則</span>
     </div>
 
-    <!-- Content -->
     <div class="content">
       <% categories = [
-        { key: :frontend, css: "section-frontend", icon: "&#127758;", fallback_title: "前端技術動態" },
-        { key: :backend, css: "section-backend", icon: "&#9881;&#65039;", fallback_title: "後端技術動態" },
-        { key: :devops, css: "section-devops", icon: "&#9729;&#65039;", fallback_title: "DevOps 相關資訊" }
+        { key: :frontend, css: "section-frontend", tag: "FE", fallback_title: "前端技術動態" },
+        { key: :backend, css: "section-backend", tag: "BE", fallback_title: "後端技術動態" },
+        { key: :devops, css: "section-devops", tag: "OPS", fallback_title: "DevOps 相關資訊" }
       ] %>
 
       <% categories.each do |cat| %>
@@ -242,9 +256,9 @@
         <% item_count = (section[:items]&.size || 0) if item_count.zero? %>
         <div class="section <%= cat[:css] %>">
           <div class="section-header">
-            <span class="section-icon"><%= cat[:icon] %></span>
+            <span class="section-tag"><%= cat[:tag] %></span>
             <h2 class="section-title"><%= section[:section_title] || cat[:fallback_title] %></h2>
-            <span class="section-count">(<%= item_count %> 則)</span>
+            <span class="section-count">· <%= item_count %></span>
           </div>
 
           <% if item_count.zero? %>
@@ -273,15 +287,14 @@
                       <div class="summary-part">
                         <% if label %>
                           <div class="summary-part-label"><%= label %></div>
-                          <div><%= truncate_text(content.to_s, 200) %></div>
+                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 450)) %></div>
                         <% else %>
-                          <div><%= truncate_text(content.to_s, 300) %></div>
+                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 400)) %></div>
                         <% end %>
                       </div>
                     <% end %>
                   </div>
                   <p class="item-source">
-                    &#128279;
                     <% if item[:source_url] && !item[:source_url].to_s.empty? %>
                       <a href="<%= item[:source_url] %>"><%= item[:source_name] || shorten_url(item[:source_url].to_s) %></a>
                     <% else %>
@@ -296,12 +309,8 @@
       <% end %>
     </div>
 
-    <!-- Footer -->
     <div class="footer">
-      <p>
-        此信件由 <a href="https://github.com/william-eth/web_tech_feeder">Web Tech Feeder</a> 自動產生<br>
-        由 AI 協助摘要整理，僅供參考
-      </p>
+      <a href="https://github.com/william-eth/web_tech_feeder">Web Tech Feeder</a> · AI-powered digest
     </div>
   </div>
 </body>
