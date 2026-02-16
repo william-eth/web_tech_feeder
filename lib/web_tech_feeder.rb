@@ -14,8 +14,9 @@ require_relative "notifier/smtp_notifier"
 # Coordinates data collection, AI summarization, and email delivery.
 module WebTechFeeder
   module DigestLimits
-    MAX_ITEMS_PER_CATEGORY = 5
+    MAX_ITEMS_PER_CATEGORY = 10
     MAX_RELEASES_PER_CATEGORY = 3
+    MAX_TOTAL_PER_CATEGORY = 7 # releases + others combined
     MIN_ISSUE_BLOG_PER_CATEGORY = 2
     ISSUE_BLOG_TYPES = %w[issue other].freeze
   end
@@ -71,10 +72,15 @@ module WebTechFeeder
         releases = items.select { |i| item_type(i) == "release" }
         others = items.reject { |i| item_type(i) == "release" }
 
-        section.merge(
-          release_items: releases.first(DigestLimits::MAX_RELEASES_PER_CATEGORY),
-          other_items: others.first(DigestLimits::MAX_ITEMS_PER_CATEGORY)
-        )
+        # When all items are major (critical/high), bypass the 7-item cap; show up to 10
+        all_major = items.all? { |i| %w[critical high].include?((i[:importance] || "").downcase) }
+        total_cap = all_major ? DigestLimits::MAX_ITEMS_PER_CATEGORY : DigestLimits::MAX_TOTAL_PER_CATEGORY
+
+        release_items = releases.first(DigestLimits::MAX_RELEASES_PER_CATEGORY)
+        remaining_slots = total_cap - release_items.size
+        other_items = others.first([remaining_slots, 0].max)
+
+        section.merge(release_items: release_items, other_items: other_items)
       end
     end
 
