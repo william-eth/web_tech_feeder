@@ -37,6 +37,18 @@ DRY_RUN=true bundle exec ruby bin/generate_digest
 bundle exec ruby bin/generate_digest
 ```
 
+### Useful Runtime Toggles
+
+- `LOOKBACK_DAYS=7`: Full-day window in TPE (UTC+8), from N days ago `00:00` to `now`
+- `DEEP_PR_CRAWL=false`: Skip PR compare and linked-PR deep crawling for faster experiments
+- `DRY_RUN=true`: Render preview only, no email delivery
+
+### AI Retry Behavior
+
+- AI processing retries up to 3 times per category on any processing error
+- Category-to-category wait is 5 seconds
+- If all retries fail, the category falls back to deterministic non-AI summary output
+
 ## Adding Data Sources
 
 1. Edit `lib/sources.yml`

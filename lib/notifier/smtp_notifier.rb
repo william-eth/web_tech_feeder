@@ -162,13 +162,19 @@ module WebTechFeeder
         structured.any? ? structured : [[nil, text]]
       end
 
-      # Truncate text to max_length, appending "..." if truncated
+      # Truncate text to max_length, appending "..." if truncated.
+      # Prefers breaking at last space to avoid mid-word cuts (e.g. "strate..." -> "...").
       def truncate_text(text, max_length = 200)
         return "" if text.nil?
 
-        # Clean up: remove excessive whitespace, newlines
         cleaned = text.gsub(/\s+/, " ").strip
-        cleaned.length > max_length ? "#{cleaned[0...max_length]}..." : cleaned
+        return cleaned if cleaned.length <= max_length
+
+        cut = cleaned[0...max_length]
+        last_space = cut.rindex(/\s/)
+        # If truncation cuts mid-word, break at last space instead
+        cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
+        "#{cut}..."
       end
 
       # Shorten a URL for display (remove protocol, truncate path)
@@ -182,8 +188,8 @@ module WebTechFeeder
         CGI.escapeHTML(str.to_s)
       end
 
-      # Format summary content: escape HTML, convert ```...``` code blocks to <code> elements.
-      # Prevents layout breakage from code containing <, >, or long unbreakable strings.
+      # Format summary content: escape HTML, convert ```...``` to block code, `...` to inline code.
+      # Inline code gets gray background for markdown-like readability.
       def format_summary_content(text)
         return "" if text.to_s.strip.empty?
 
@@ -195,7 +201,8 @@ module WebTechFeeder
             code = part.strip.gsub(/\r\n|\r/, "\n")
             result << '<code class="summary-code">' << code << "</code>"
           else
-            result << part
+            # Convert inline `text` to styled <code> (markdown-style)
+            result << part.gsub(/`([^`]+)`/, '<code class="summary-inline-code">\1</code>')
           end
         end
         result

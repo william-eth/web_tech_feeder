@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
+require "securerandom"
 require_relative "config"
+require_relative "enrichers"
 require_relative "collectors/github_release_collector"
 require_relative "collectors/github_issue_collector"
 require_relative "collectors/rss_collector"
@@ -24,15 +26,16 @@ module WebTechFeeder
   class << self
     def run
       config = Config.new
+      config.run_id = "run-#{Time.now.utc.strftime('%Y%m%dT%H%M%S')}-#{SecureRandom.hex(4)}"
       logger = config.logger
 
-      logger.info("=== Web Tech Feeder - Starting weekly digest generation ===")
-      logger.info("Looking back #{config.lookback_days} days from #{Time.now}")
+      logger.info("[cid=#{config.run_id}] === Web Tech Feeder - Starting weekly digest generation ===")
+      logger.info("[cid=#{config.run_id}] Looking back #{config.lookback_days} days in TPE since #{config.cutoff_time}")
 
       # Step 1: Collect raw data from all sources
       raw_data = collect_all(config)
       total = raw_data.values.sum(&:size)
-      logger.info("Collected #{total} items total across all categories")
+      logger.info("[cid=#{config.run_id}] Collected #{total} items total across all categories")
 
       if total.zero?
         logger.warn("No items found in the past #{config.lookback_days} days. Skipping digest.")
@@ -56,7 +59,7 @@ module WebTechFeeder
         notifier.send_digest(digest_data)
       end
 
-      logger.info("=== Web Tech Feeder - Digest generation complete ===")
+      logger.info("[cid=#{config.run_id}] === Web Tech Feeder - Digest generation complete ===")
     rescue StandardError => e
       config&.logger&.error("Fatal error: #{e.message}\n#{e.backtrace&.first(5)&.join("\n")}")
       raise
@@ -172,32 +175,44 @@ module WebTechFeeder
       sources = config.sources
 
       {
-        frontend: collect_category(config, sources[:frontend]),
-        backend: collect_category(config, sources[:backend]),
-        devops: collect_category(config, sources[:devops])
+        frontend: collect_category(config, :frontend, sources[:frontend]),
+        backend: collect_category(config, :backend, sources[:backend]),
+        devops: collect_category(config, :devops, sources[:devops])
       }
     end
 
     # Unified category collector - handles all source types
-    def collect_category(config, source_config)
+    def collect_category(config, category, source_config)
       items = []
       return items unless source_config
 
       # GitHub Releases
       if source_config[:github_releases]&.any?
-        collector = Collectors::GithubReleaseCollector.new(config, repos: source_config[:github_releases])
+        collector = Collectors::GithubReleaseCollector.new(
+          config,
+          repos: source_config[:github_releases],
+          section_key: category
+        )
         items.concat(collector.collect)
       end
 
       # GitHub Issues & PRs (community discussions)
       if source_config[:github_issues]&.any?
-        collector = Collectors::GithubIssueCollector.new(config, repos: source_config[:github_issues])
+        collector = Collectors::GithubIssueCollector.new(
+          config,
+          repos: source_config[:github_issues],
+          section_key: category
+        )
         items.concat(collector.collect)
       end
 
       # RSS Feeds
       if source_config[:rss_feeds]&.any?
-        collector = Collectors::RssCollector.new(config, feeds: source_config[:rss_feeds])
+        collector = Collectors::RssCollector.new(
+          config,
+          feeds: source_config[:rss_feeds],
+          section_key: category
+        )
         items.concat(collector.collect)
       end
 

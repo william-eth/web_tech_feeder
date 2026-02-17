@@ -43,13 +43,14 @@
     }
     .header .item-count {
       display: inline-block;
-      font-size: 11px;
+      font-size: 12px;
       font-family: ui-monospace, monospace;
-      color: #64748b;
+      color: #cbd5e1;
       background: #1e293b;
-      padding: 3px 10px;
+      padding: 4px 12px;
       border-radius: 4px;
       margin-top: 10px;
+      font-weight: 500;
     }
 
     /* Content */
@@ -197,6 +198,14 @@
       overflow-x: auto;
       max-width: 100%;
     }
+    .summary-inline-code {
+      font-family: ui-monospace, 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.9em;
+      background: #e2e8f0;
+      color: #334155;
+      padding: 2px 6px;
+      border-radius: 3px;
+    }
 
     .item-source {
       font-size: 11px;
@@ -287,9 +296,9 @@
                       <div class="summary-part">
                         <% if label %>
                           <div class="summary-part-label"><%= label %></div>
-                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 450)) %></div>
+                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 1200)) %></div>
                         <% else %>
-                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 400)) %></div>
+                          <div class="summary-part-body"><%= format_summary_content(truncate_text(content.to_s, 1200)) %></div>
                         <% end %>
                       </div>
                     <% end %>

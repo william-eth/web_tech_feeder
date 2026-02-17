@@ -59,9 +59,9 @@ flowchart LR
 - **Security**: RubyGems advisories
 
 ### DevOps
-- **Releases**: Redis (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
+- **Releases**: PostgreSQL (server), Redis (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
 - **Issues/PRs**: Community discussions from above repos
-- **RSS**: PostgreSQL News & Releases, Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, HashiCorp Security Bulletins, AWS News, AWS Security, Kubernetes Blog
+- **RSS**: Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, HashiCorp Security Bulletins, AWS News, AWS Security, Kubernetes Blog
 - **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, Docker CLI)
 
 ## Prerequisites
@@ -184,10 +184,15 @@ web_tech_feeder/
 |----------|---------|-------------|
 | `AI_PROVIDER` | `gemini` | `gemini` or `openai` |
 | `DRY_RUN` | `false` | `true` = preview only, no email |
-| `LOOKBACK_DAYS` | `7` | Days to look back |
+| `DEEP_PR_CRAWL` | `true` | `false` = skip PR compare + linked PR deep crawling to speed up test runs |
+| `LOOKBACK_DAYS` | `7` | Full-day window in TPE (UTC+8): from N days ago `00:00` to `now` |
 | `DIGEST_MIN_IMPORTANCE` | `high` | `high`, `medium`, or `low` |
 | `AI_MAX_TOKENS` | `16384` | Max completion/output tokens |
 | `AI_USE_MAX_COMPLETION_TOKENS` | auto | Set `true` if model rejects `max_tokens` (e.g. GPT-5.x, o1); auto-detected for `gpt-5*`, `o1-*`, `o3-*` |
+
+AI processing reliability:
+- Retries up to 3 times per category on any processing error (API/network/empty response/invalid JSON)
+- Category-to-category wait is 5 seconds (`frontend` -> `backend` -> `devops`)
 
 ### Sources
 

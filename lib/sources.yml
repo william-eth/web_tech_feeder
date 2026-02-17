@@ -1,3 +1,23 @@
+section_file_filters:
+  frontend:
+    - '(^|/)(frontend|web|ui|client)(/|$)'
+    - '\.(tsx?|jsx?|css|scss|sass|less|vue|svelte)$'
+    - '(^|/)(src/)?(components?|pages?|views?|app|hooks|store|router)(/|$)'
+    - '(^|/)(next|nuxt|vite|webpack|babel|eslint|prettier|tailwind)'
+  backend:
+    - '(^|/)(backend|server|api|app|lib|models?|controllers?|services?|workers?|jobs?)(/|$)'
+    - '(^|/)db(/|$)'
+    - '(^|/)(migrate|schema|seeds)(/|$)'
+    - '\.(rb|py|go|java|kt)$'
+    - '(^|/)(gemfile|rakefile|puma|sidekiq)'
+  devops:
+    - '(^|/)\.github/workflows(/|$)'
+    - '(^|/)(infra|infrastructure|ops|deploy|deployment|k8s|kubernetes|helm|terraform|ansible)(/|$)'
+    - '(^|/)(docker|compose|container)(/|$)'
+    - '(^|/)(ci|cd|pipeline)(/|$)'
+    - '(^|/)(chart|manifests?)(/|$)'
+    - '(^|/)Dockerfile'
+
 frontend:
   github_releases:
     - owner: nodejs
@@ -151,7 +171,10 @@ backend:
 devops:
   github_releases:
     # Database/cache servers (distinct from backend pg gem / redis-rb client)
-    # PostgreSQL: uses Planet PostgreSQL RSS; no GitHub Releases
+    # PostgreSQL: releases and security fixes via official GitHub; Redis: releases only
+    - owner: postgres
+      repo: postgres
+      name: PostgreSQL (server)
     - owner: redis
       repo: redis
       name: Redis (server)
@@ -193,9 +216,6 @@ devops:
       name: Amazon EKS AMI
 
   github_issues:
-    - owner: redis
-      repo: redis
-      name: Redis (server)
     - owner: helm
       repo: helm
       name: Helm
@@ -231,9 +251,6 @@ devops:
       name: Amazon EKS AMI
 
   rss_feeds:
-    # PostgreSQL community news (includes official release announcements)
-    - url: https://planet.postgresql.org/rss20.xml
-      name: PostgreSQL News & Releases
     # AWS EKS Kubernetes version lifecycle (doc changes = version/support updates)
     - url: https://github.com/awsdocs/amazon-eks-user-guide/commits/mainline/latest/ug/versioning/kubernetes-versions.adoc.atom
       name: Amazon EKS Kubernetes Versions (doc updates)

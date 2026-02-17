@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-18
+
+### Added
+- **GitHub Issue collector**: Fetches full comments via `/issues/{number}/comments` for each notable issue/PR; body now includes description + full discussion before AI summarization
+- **RSS enrichment**: Entries linking to Redmine (bugs.ruby-lang.org/issues/{id}) or GitHub (issues/PRs) are enriched with full content + comments/journals via API before summarization
+- **RedmineEnricher**: Fetches issue + journals from Redmine REST API for Ruby Bug Tracker entries
+- **GitHubEnricher**: Fetches issue/PR + comments for GitHub-linked RSS entries
+- **Deep PR crawl flag**: `DEEP_PR_CRAWL` can disable PR compare/linked PR deep crawling for faster dry runs and experiments
+- **Run-level API cache**: In-memory cache avoids duplicate fetches for issue/PR meta, PR files, and comments during the same run
+- **Cache hit visibility**: Logs now show `[cache-hit]` entries with namespace/key and value summary
+
+### Changed
+- **Processor**: Per-item body truncation increased from 200 to 800 chars to accommodate enriched comment content
+- **PostgreSQL / Redis (devops)**: Focus on version releases and security only; add PostgreSQL (server) GitHub releases, remove Planet PostgreSQL RSS (too detailed), remove Redis from github_issues
+- **Lookback window**: `LOOKBACK_DAYS` now uses full-day boundaries in TPE (UTC+8), from N days ago `00:00` to `now`
+- **AI retry policy**: Retry up to 3 times on any processing error per category; fallback only after retries are exhausted
+- **AI pacing**: Category-to-category delay reduced from 15 seconds to 5 seconds
+- **Reference extraction**: Tightened GitHub reference detection to avoid false positives (for example, non-GitHub tracker IDs in release/issue text)
+- **Documentation sync**: Updated README, `.env.example`, and docs (`CONTRIBUTING`/`PLAN`) for `DEEP_PR_CRAWL`, TPE full-day lookback semantics, and AI retry behavior
+
+### Fixed
+- **Nginx false references**: Avoid repeated 404 noise when non-GitHub `#number` tokens are mistakenly treated as GitHub issue/PR references
+- **AI failure observability**: Retry and final-failure logs now include error class, reason, and short backtrace
+
 ## [0.1.5] - 2026-02-18
 
 ### Fixed
@@ -102,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...HEAD
+[1.0.0]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...1.0.0
 [0.1.5]: https://github.com/william-eth/web_tech_feeder/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/william-eth/web_tech_feeder/compare/0.1.3...0.1.4
 [0.1.3]: https://github.com/william-eth/web_tech_feeder/compare/0.1.2...0.1.3

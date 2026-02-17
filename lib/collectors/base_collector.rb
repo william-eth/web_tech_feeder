@@ -73,6 +73,11 @@ module WebTechFeeder
 
         text.length > max_length ? "#{text[0...max_length]}..." : text
       end
+
+      def cid_tag
+        rid = config.respond_to?(:run_id) ? config.run_id.to_s : ""
+        rid.empty? ? "" : "cid=#{rid} "
+      end
     end
   end
 end
