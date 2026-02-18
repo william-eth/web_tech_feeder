@@ -14,7 +14,7 @@ module WebTechFeeder
       API_URL = "https://api.github.com"
       RATE_LIMIT_MAX_RETRIES = 4
       RATE_LIMIT_BASE_WAIT_SECONDS = 2
-      RATE_LIMIT_MAX_WAIT_SECONDS = 30
+      RATE_LIMIT_MAX_WAIT_SECONDS = 120
 
       def initialize(token:, logger: nil, cache_provider: nil, run_id: nil)
         @token = token.to_s
@@ -61,12 +61,17 @@ module WebTechFeeder
         nil
       end
 
-      def fetch_issue_comments(owner, repo, number, max_no_token:, pagination_log_tag: nil, error_log: nil, empty_on_error: [])
+      def fetch_issue_comments(owner, repo, number, max_no_token:, max_with_token: nil, pagination_log_tag: nil, error_log: nil, empty_on_error: [])
         mode = token_present? ? "full" : "limited"
-        cache_key = "#{owner}/#{repo}##{number}:#{mode}:max#{max_no_token}"
+        token_cap = max_with_token.to_i.positive? ? max_with_token.to_i : "all"
+        cache_key = "#{owner}/#{repo}##{number}:#{mode}:max#{max_no_token}:token_cap#{token_cap}"
         cache_fetch("gh_issue_comments", cache_key) do
           if token_present?
-            fetch_paginated_json("/repos/#{owner}/#{repo}/issues/#{number}/comments", pagination_log_tag)
+            fetch_paginated_json(
+              "/repos/#{owner}/#{repo}/issues/#{number}/comments",
+              pagination_log_tag,
+              max_items: (max_with_token.to_i.positive? ? max_with_token.to_i : nil)
+            )
           else
             get_json("/repos/#{owner}/#{repo}/issues/#{number}/comments", per_page: max_no_token)
           end
@@ -103,16 +108,21 @@ module WebTechFeeder
         end
       end
 
-      def fetch_paginated_json(path, log_tag)
+      def fetch_paginated_json(path, log_tag, max_items: nil)
         page = 1
         all = []
         tag = log_tag ? Utils::LogTagStyler.style(log_tag) : nil
-        @logger&.info("#{cid_tag}#{tag} start full pagination") if log_tag
+        @logger&.info("#{cid_tag}#{tag} start full pagination#{max_items ? " max_items=#{max_items}" : ''}") if log_tag
         loop do
           rows = get_json(path, per_page: 100, page: page)
           break if rows.empty?
 
           all.concat(rows)
+          if max_items && all.size >= max_items
+            all = all.first(max_items)
+            @logger&.info("#{cid_tag}#{tag} page=#{page} reached max_items=#{max_items}") if log_tag
+            break
+          end
           @logger&.info("#{cid_tag}#{tag} page=#{page} fetched=#{rows.size} total=#{all.size}") if log_tag
           break if rows.size < 100
 
@@ -156,13 +166,32 @@ module WebTechFeeder
       end
 
       def backoff_wait_seconds(retries, headers)
+        reset_wait = rate_limit_reset_wait(headers)
+        return reset_wait if reset_wait
+
         retry_after = headers["retry-after"] || headers["Retry-After"]
         if retry_after.to_s.match?(/\A\d+\z/)
           parsed = retry_after.to_i
-          return parsed if parsed.positive?
+          return bounded_wait(parsed) if parsed.positive?
         end
 
-        [RATE_LIMIT_BASE_WAIT_SECONDS * (2**(retries - 1)), RATE_LIMIT_MAX_WAIT_SECONDS].min
+        base = RATE_LIMIT_BASE_WAIT_SECONDS * (2**(retries - 1))
+        bounded_wait(base)
+      end
+
+      def rate_limit_reset_wait(headers)
+        reset = headers["x-ratelimit-reset"] || headers["X-RateLimit-Reset"]
+        return nil unless reset.to_s.match?(/\A\d+\z/)
+
+        seconds = reset.to_i - Time.now.to_i + 1
+        return nil unless seconds.positive?
+
+        bounded_wait(seconds)
+      end
+
+      def bounded_wait(seconds)
+        jitter = rand(0.0..1.2)
+        [[seconds + jitter, 1.0].max, RATE_LIMIT_MAX_WAIT_SECONDS].min.round
       end
 
       def cache_fetch(namespace, key, &block)

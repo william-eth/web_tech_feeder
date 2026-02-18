@@ -14,8 +14,11 @@ module WebTechFeeder
       NOTABLE_THRESHOLD = 3
       MAX_FETCH_RETRIES = 3
       MAX_COMMENTS_NO_TOKEN = 20
+      MAX_COMMENTS_WITH_TOKEN = 80
       MAX_PR_FILES_NO_TOKEN = 20
       MAX_LINKED_PR_REFS_NO_TOKEN = 5
+      MAX_CONTEXT_ITEMS_PER_REPO_NO_TOKEN = 8
+      MAX_CONTEXT_ITEMS_PER_REPO_WITH_TOKEN = 20
 
       # repos: Array of { owner:, repo:, name: } hashes
       def initialize(config, repos:, section_key: nil)
@@ -39,7 +42,7 @@ module WebTechFeeder
           issues = fetch_with_retry(owner, repo)
           next [] if issues.nil?
 
-          notable = filter_notable(issues)
+          notable = select_context_candidates(filter_notable(issues))
           notable.map { |issue| build_item(issue, owner, repo, name) }
         end
 
@@ -84,6 +87,18 @@ module WebTechFeeder
         issues.select do |issue|
           engagement_score(issue) >= NOTABLE_THRESHOLD || notable_labels?(issue)
         end
+      end
+
+      def select_context_candidates(issues)
+        limit = github_token_present? ? MAX_CONTEXT_ITEMS_PER_REPO_WITH_TOKEN : MAX_CONTEXT_ITEMS_PER_REPO_NO_TOKEN
+        ranked = issues.sort_by do |issue|
+          updated = safe_parse_time(issue["updated_at"])&.to_i || 0
+          [-engagement_score(issue), -updated]
+        end
+        selected = ranked.first(limit)
+        dropped = [issues.size - selected.size, 0].max
+        logger.info("#{cid_tag}[issue-context] selected=#{selected.size} dropped=#{dropped} cap=#{limit}") if dropped.positive?
+        selected
       end
 
       def engagement_score(issue)
@@ -206,6 +221,8 @@ module WebTechFeeder
           repo,
           number,
           max_no_token: MAX_COMMENTS_NO_TOKEN,
+          max_with_token: MAX_COMMENTS_WITH_TOKEN,
+          pagination_log_tag: "issue-comments #{owner}/#{repo}##{number}",
           error_log: "Failed to fetch comments for #{owner}/#{repo}##{number}",
           empty_on_error: nil
         )
