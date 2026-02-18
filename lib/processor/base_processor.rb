@@ -2,6 +2,8 @@
 
 require "erb"
 require "json"
+require_relative "../utils/item_type_inferrer"
+require_relative "../utils/text_truncator"
 
 module WebTechFeeder
   module Processor
@@ -108,7 +110,7 @@ module WebTechFeeder
           lines << "  Source: #{item.source}"
           body = item.body.to_s.strip
           if body.length.positive?
-            truncated = body.length > BODY_TRUNCATE ? "#{body[0...BODY_TRUNCATE]}..." : body
+            truncated = Utils::TextTruncator.truncate(body, max_length: BODY_TRUNCATE)
             lines << "  Body: #{truncated}"
           end
           lines << ""
@@ -142,17 +144,7 @@ module WebTechFeeder
       end
 
       def infer_item_type(item)
-        title = (item[:title] || "").downcase
-        source = (item[:source_name] || "").downcase
-        if title.include?("released") || title.include?("release") || source.include?("/releases/")
-          "release"
-        elsif source.include?("advisory") || title.include?("cve") || title.include?("security")
-          "advisory"
-        elsif source.include?("issue") || source.include?("pr")
-          "issue"
-        else
-          "other"
-        end
+        Utils::ItemTypeInferrer.infer(item)
       end
 
       def try_parse_json(str)
@@ -238,17 +230,7 @@ module WebTechFeeder
       end
 
       def infer_item_type_from_raw(item)
-        title = item.title.to_s.downcase
-        source = item.source.to_s.downcase
-        if title.include?("released") || title.include?("release") || source.include?("/releases/")
-          "release"
-        elsif source.include?("advisory") || title.include?("cve") || title.include?("security")
-          "advisory"
-        elsif source.include?("issue") || source.include?("pr")
-          "issue"
-        else
-          "other"
-        end
+        Utils::ItemTypeInferrer.infer(item)
       end
 
       def clean_summary(body)

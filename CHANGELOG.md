@@ -11,25 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **GitHub Issue collector**: Fetches full comments via `/issues/{number}/comments` for each notable issue/PR; body now includes description + full discussion before AI summarization
-- **RSS enrichment**: Entries linking to Redmine (bugs.ruby-lang.org/issues/{id}) or GitHub (issues/PRs) are enriched with full content + comments/journals via API before summarization
-- **RedmineEnricher**: Fetches issue + journals from Redmine REST API for Ruby Bug Tracker entries
-- **GitHubEnricher**: Fetches issue/PR + comments for GitHub-linked RSS entries
+- **RSS enrichment + enrichers**: Added API-based enrichment for RSS entries linking to Redmine/GitHub, powered by `RedmineEnricher` and `GitHubEnricher`
+- **Shared GitHub abstractions**: Added `Github::Client` and `Github::ReferenceExtractor` to centralize GitHub fetch/pagination/cache logic and strict reference parsing rules
 - **Deep PR crawl flag**: `DEEP_PR_CRAWL` can disable PR compare/linked PR deep crawling for faster dry runs and experiments
-- **Run-level API cache**: In-memory cache avoids duplicate fetches for issue/PR meta, PR files, and comments during the same run
-- **Cache hit visibility**: Logs now show `[cache-hit]` entries with namespace/key and value summary
+- **Run-level API cache + visibility**: In-memory cache avoids duplicate fetches for issue/PR meta, PR files, and comments; logs now show `[cache-hit]` with namespace/key and value summary
 
 ### Changed
-- **Processor**: Per-item body truncation increased from 200 to 800 chars to accommodate enriched comment content
-- **PostgreSQL / Redis (devops)**: Focus on version releases and security only; add PostgreSQL (server) GitHub releases, remove Planet PostgreSQL RSS (too detailed), remove Redis from github_issues
-- **Lookback window**: `LOOKBACK_DAYS` now uses full-day boundaries in TPE (UTC+8), from N days ago `00:00` to `now`
-- **AI retry policy**: Retry up to 3 times on any processing error per category; fallback only after retries are exhausted
-- **AI pacing**: Category-to-category delay reduced from 15 seconds to 5 seconds
-- **Reference extraction**: Tightened GitHub reference detection to avoid false positives (for example, non-GitHub tracker IDs in release/issue text)
-- **Documentation sync**: Updated README, `.env.example`, and docs (`CONTRIBUTING`/`PLAN`) for `DEEP_PR_CRAWL`, TPE full-day lookback semantics, and AI retry behavior
+- **Collection throughput and stability**: Added bounded parallel collection controls (`COLLECT_PARALLEL`, `MAX_COLLECT_THREADS`, `MAX_REPO_THREADS`), GitHub rate-limit exponential backoff (`429` and secondary-rate-limit `403`), and deterministic post-collection sorting to keep output order stable under concurrency.
+- **GitHub release coverage for tag-first projects**: `github_release` collection now supports `auto` strategy (`releases -> tags` fallback) and optional changelog-file enrichment (`release_notes_files`) to reduce sparse summaries for repos that publish via tags/changelog files instead of GitHub Releases.
+- **Architecture modularization**: Refactored shared logic into reusable modules/services across phases: `Utils::ItemTypeInferrer`, `Utils::TextTruncator`, `Utils::LogContext`, `Utils::ParallelExecutor`, `Github::PrCompareFormatter`, `Github::PrContextBuilder`, `Services::DigestPipeline`, `Services::CategoryCollector`, `Services::DigestFilter`, plus extracted `DigestLimits` and a thin `WebTechFeeder.run` entrypoint.
+- **Logging and observability UX**: Introduced `Utils::LogFormatter`, ANSI/BBS startup and phase output, improved runtime/timing readability, reduced repeated CID prefixes, added colorized tags for compare/link-related logs, and added `VERBOSE_THREAD_LOGS` for thread-level tracing when needed.
+- **AI processing behavior**: Increased per-item processor body truncation from 200 to 800 chars, retries up to 3 times for any category processing error before fallback, and reduced category pacing delay from 15s to 5s.
+- **Reference parsing accuracy**: Tightened GitHub reference extraction to reduce false positives from non-GitHub tracker IDs, and added changelog-style bracket reference support (for example, `[#1234]`, `[PR #1234]`) to improve linked PR resolution quality.
+- **Runtime defaults and date semantics**: CI now enables YJIT by default (`RUBY_YJIT_ENABLE=1`), local runs can opt in via `.env`, and `LOOKBACK_DAYS` now uses TPE full-day boundaries (`N days ago 00:00` to now).
+- **DevOps source curation**: Adjusted PostgreSQL/Redis scope toward release and security relevance (added PostgreSQL server releases; removed overly detailed Planet PostgreSQL RSS and Redis from `github_issues`).
+- **Documentation alignment**: Updated `README.md`, `.env.example`, and docs (`CONTRIBUTING`/`PLAN`/`GITHUB_ACTIONS`) to reflect deep PR crawl, parallel controls, lookback semantics, YJIT behavior, retries, and modularized architecture.
 
 ### Fixed
 - **Nginx false references**: Avoid repeated 404 noise when non-GitHub `#number` tokens are mistakenly treated as GitHub issue/PR references
 - **AI failure observability**: Retry and final-failure logs now include error class, reason, and short backtrace
+- **YJIT local bootstrap robustness**: `bin/generate_digest` now re-execs with `--yjit` when `.env` sets `RUBY_YJIT_ENABLE=1`, and uses an absolute script path to avoid path resolution issues
 
 ## [0.1.5] - 2026-02-18
 

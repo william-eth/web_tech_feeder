@@ -90,6 +90,11 @@ backend:
     - owner: sidekiq
       repo: sidekiq
       name: Sidekiq
+      release_strategy: auto
+      release_notes_files:
+        - Changes.md
+        - Pro-Changes.md
+        - Ent-Changes.md
     - owner: jwt
       repo: ruby-jwt
       name: ruby-jwt

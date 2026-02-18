@@ -140,43 +140,33 @@ Runs every Monday 08:00 (UTC+8); can be triggered manually from the **Actions** 
 
 ## Documentation
 
-See [docs/](docs/) for setup guides and contributing guidelines.
+Use docs by intent:
+- User setup and operations: this `README.md`
+- Developer workflow and code change entrypoints: `docs/CONTRIBUTING.md`
+- Architecture decisions and trade-offs: `docs/PLAN.md`
 
 ## Project Structure
 
+High-level runtime layout:
+
 ```
 web_tech_feeder/
-├── .github/workflows/
-│   └── weekly_digest.yml
-├── .rubocop.yml
-├── .ruby-version
-├── CHANGELOG.md
-├── docs/                     # Documentation
 ├── lib/
-│   ├── web_tech_feeder.rb       # Orchestrator
-│   ├── config.rb                # Config loader
-│   ├── sources.yml               # Source definitions
-│   ├── collectors/
-│   │   ├── base_collector.rb
-│   │   ├── github_release_collector.rb
-│   │   ├── github_issue_collector.rb
-│   │   ├── github_advisory_collector.rb
-│   │   ├── rss_collector.rb
-│   │   └── rubygems_collector.rb
-│   ├── processor/
-│   │   ├── base_processor.rb     # Shared prompt, parsing
-│   │   ├── gemini_processor.rb
-│   │   └── openai_processor.rb
-│   ├── prompts/
-│   │   └── category_digest.erb   # Prompt template
-│   ├── notifier/
-│   │   └── smtp_notifier.rb
-│   └── templates/
-│       └── digest.html.erb
+│   ├── web_tech_feeder.rb        # Thin entrypoint
+│   ├── services/                 # Pipeline, collection orchestration, digest filtering
+│   ├── collectors/               # Source collection from GitHub/RSS/RubyGems/Advisories
+│   ├── enrichers/                # RSS-linked issue/PR enrichment
+│   ├── github/                   # Shared GitHub client and compare/reference helpers
+│   ├── processor/                # AI processing (Gemini/OpenAI-compatible)
+│   ├── notifier/                 # Digest delivery
+│   ├── templates/                # HTML digest template
+│   └── utils/                    # Shared utility modules
+├── docs/                         # Contributor and design docs
 ├── bin/generate_digest
-├── Gemfile
 └── .env.example
 ```
+
+For file-level mapping and change entrypoints, see `docs/CONTRIBUTING.md`.
 
 ## Configuration
 
@@ -185,7 +175,13 @@ web_tech_feeder/
 | `AI_PROVIDER` | `gemini` | `gemini` or `openai` |
 | `DRY_RUN` | `false` | `true` = preview only, no email |
 | `DEEP_PR_CRAWL` | `true` | `false` = skip PR compare + linked PR deep crawling to speed up test runs |
+| `COLLECT_PARALLEL` | `true` | Enable parallel source/repo collection (`false` for strict sequential mode) |
+| `MAX_COLLECT_THREADS` | `4`/`2` | Source-level worker threads (`4` with token, `2` without token) |
+| `MAX_REPO_THREADS` | `3`/`2` | Repo-level worker threads inside GitHub collectors (`3` with token, `2` without token) |
+| `VERBOSE_CID_LOGS` | `false` | Show `[cid=...]` on verbose collector/client/cache logs (run-level banners still include CID) |
+| `VERBOSE_THREAD_LOGS` | `false` | Show `[tid=...]` on verbose collector/client/cache logs for parallel debugging |
 | `LOOKBACK_DAYS` | `7` | Full-day window in TPE (UTC+8): from N days ago `00:00` to `now` |
+| `RUBY_YJIT_ENABLE` | unset | Set `1` to enable YJIT (Ruby 3.1+) |
 | `DIGEST_MIN_IMPORTANCE` | `high` | `high`, `medium`, or `low` |
 | `AI_MAX_TOKENS` | `16384` | Max completion/output tokens |
 | `AI_USE_MAX_COMPLETION_TOKENS` | auto | Set `true` if model rejects `max_tokens` (e.g. GPT-5.x, o1); auto-detected for `gpt-5*`, `o1-*`, `o3-*` |
@@ -194,11 +190,21 @@ AI processing reliability:
 - Retries up to 3 times per category on any processing error (API/network/empty response/invalid JSON)
 - Category-to-category wait is 5 seconds (`frontend` -> `backend` -> `devops`)
 
+GitHub collection reliability:
+- GitHub API 403/429 rate-limit responses use exponential backoff retry
+- Secondary rate limit (403) is treated as retryable when response message indicates rate limiting
+- Collected items are normalized with stable sort to keep output order deterministic
+
+Runtime note:
+- When `RUBY_YJIT_ENABLE=1` is set in `.env`, `bin/generate_digest` re-execs itself with `--yjit` so YJIT takes effect even though Dotenv loads after process start.
+
 ### Sources
 
 Edit `lib/sources.yml`:
 
-- **github_releases**: `owner`, `repo`, `name` — one latest release per repo
+- **github_releases**: `owner`, `repo`, `name` (optional: `release_strategy`, `release_notes_files`)
+  - `release_strategy`: `auto` (default), `releases_only`, `tags_only`
+  - `release_notes_files`: optional list of changelog-like files (e.g. `Changes.md`, `CHANGELOG.md`) used to enrich sparse release/tag notes
 - **github_issues**: `owner`, `repo`, `name`
 - **rss_feeds**: `url`, `name`
 - **rubygems**: gem names

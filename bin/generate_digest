@@ -1,8 +1,26 @@
 #!/usr/bin/env ruby
 # frozen_string_literal: true
 
+require "rbconfig"
 require "bundler/setup"
 require "dotenv/load" unless ENV["CI"]
+
+# Dotenv is loaded after Ruby starts, so RUBY_YJIT_ENABLE from .env
+# would otherwise be too late. Re-exec with --yjit once when requested.
+if ENV["RUBY_YJIT_ENABLE"] == "1" &&
+   ENV["WEB_TECH_FEEDER_YJIT_REEXEC"] != "1" &&
+   Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.1.0")
+  yjit_on = defined?(RubyVM::YJIT) && RubyVM::YJIT.respond_to?(:enabled?) && RubyVM::YJIT.enabled?
+  unless yjit_on
+    exec(
+      { "WEB_TECH_FEEDER_YJIT_REEXEC" => "1" },
+      RbConfig.ruby,
+      "--yjit",
+      File.expand_path(__FILE__),
+      *ARGV
+    )
+  end
+end
 
 require_relative "../lib/web_tech_feeder"
 

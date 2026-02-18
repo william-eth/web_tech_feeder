@@ -2,6 +2,7 @@
 
 require "faraday"
 require "json"
+require_relative "../utils/text_truncator"
 
 module WebTechFeeder
   module Enrichers
@@ -76,9 +77,7 @@ module WebTechFeeder
         end
 
         def truncate_for_prompt(text, max_length: 4000)
-          return text if text.length <= max_length
-
-          "#{text[0...max_length]}..."
+          Utils::TextTruncator.truncate(text, max_length: max_length)
         end
       end
     end

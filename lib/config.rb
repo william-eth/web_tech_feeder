@@ -3,6 +3,7 @@
 require "yaml"
 require "logger"
 require "thread"
+require_relative "utils/log_context"
 
 module WebTechFeeder
   # Loads and provides access to application configuration
@@ -119,6 +120,36 @@ module WebTechFeeder
       ENV.fetch("DEEP_PR_CRAWL", "true").downcase == "true"
     end
 
+    # Show CID on verbose collector/client logs.
+    # Default false to reduce visual noise because one run uses one CID.
+    def verbose_cid_logs?
+      ENV.fetch("VERBOSE_CID_LOGS", "false").downcase == "true"
+    end
+
+    # Show thread id on verbose collector/client logs.
+    # Useful when debugging parallel fetch behavior.
+    def verbose_thread_logs?
+      ENV.fetch("VERBOSE_THREAD_LOGS", "false").downcase == "true"
+    end
+
+    # Toggle parallel data collection (I/O-bound source fetching).
+    def collect_parallel?
+      ENV.fetch("COLLECT_PARALLEL", "true").downcase == "true"
+    end
+
+    # Max worker threads for source-level parallel collection.
+    # Default is conservative without token, higher with token.
+    def max_collect_threads
+      default = github_token_present? ? 4 : 2
+      parse_positive_int(ENV.fetch("MAX_COLLECT_THREADS", default.to_s), default)
+    end
+
+    # Max worker threads per GitHub collector when processing multiple repos.
+    def max_repo_threads
+      default = github_token_present? ? 3 : 2
+      parse_positive_int(ENV.fetch("MAX_REPO_THREADS", default.to_s), default)
+    end
+
     # Section-aware file path filters used by compare blocks.
     # Returns an array of regex pattern strings for :frontend/:backend/:devops.
     def section_file_filter_patterns(section_key)
@@ -164,8 +195,11 @@ module WebTechFeeder
     end
 
     def cid_tag
-      rid = run_id.to_s.strip
-      rid.empty? ? "" : "[cid=#{rid}] "
+      Utils::LogContext.tag(
+        run_id: run_id,
+        show_cid: verbose_cid_logs?,
+        show_thread: verbose_thread_logs?
+      )
     end
 
     def cache_value_summary(value)
@@ -181,5 +215,15 @@ module WebTechFeeder
         value.class.to_s
       end
     end
+
+    def parse_positive_int(value, fallback)
+      num = value.to_i
+      num.positive? ? num : fallback
+    end
+
+    def github_token_present?
+      !github_token.to_s.strip.empty?
+    end
+
   end
 end

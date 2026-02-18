@@ -1,8 +1,11 @@
 # frozen_string_literal: true
 
 require "time"
+require "base64"
 require_relative "base_collector"
 require_relative "../section_file_filter"
+require_relative "../github/reference_extractor"
+require_relative "../utils/log_tag_styler"
 
 module WebTechFeeder
   module Collectors
@@ -28,7 +31,6 @@ module WebTechFeeder
     # - previous-version compare summary
     # - linked PR/Issue details + comments (when references are present)
     class GithubReleaseCollector < BaseCollector
-      GITHUB_API_URL = "https://api.github.com"
       MAX_FETCH_RETRIES = 3
 
       MAX_COMPARE_FILES = 25
@@ -36,6 +38,8 @@ module WebTechFeeder
       MAX_LINKED_REFERENCES = 5
       MAX_COMMENTS_PER_REFERENCE = 8
       MAX_ENRICHED_BODY = 6_000
+      MAX_TAGS_SCAN = 20
+      DEFAULT_RELEASE_NOTES_FILES = %w[CHANGELOG.md CHANGES.md Changes.md HISTORY.md RELEASE_NOTES.md].freeze
 
       # repos: Array of { owner:, repo:, name: } hashes
       def initialize(config, repos:, section_key: nil)
@@ -45,45 +49,45 @@ module WebTechFeeder
       end
 
       def collect
-        items = []
         logger.info("#{cid_tag}GitHub release collector token mode: #{github_token_present? ? 'full' : 'limited'}")
         logger.info("#{cid_tag}GitHub release collector deep_pr_crawl=#{config.deep_pr_crawl?}")
+        logger.info("#{cid_tag}GitHub release collector max_repo_threads=#{config.max_repo_threads}")
 
-        @repos.each do |repo_config|
+        repo_items = parallel_map(@repos, max_threads: config.max_repo_threads) do |repo_config|
           owner = repo_config[:owner]
           repo = repo_config[:repo]
           name = repo_config[:name]
+          strategy = release_strategy(repo_config)
 
-          logger.info("Fetching GitHub releases for #{owner}/#{repo}")
-          releases = fetch_with_retry(owner, repo)
-          next if releases.nil?
+          logger.info("Fetching GitHub versions for #{owner}/#{repo} (strategy=#{strategy})")
+          releases = fetch_with_retry(owner, repo) unless strategy == "tags_only"
 
-          # Keep only the latest release per repo (by version, not published_at)
-          # Prefer highest semver (v2.0.0 over v1.9.1); use published_at as tiebreaker
-          recent_releases = releases
-                            .map { |r| [r, safe_parse_time(r["published_at"])] }
-                            .select { |_r, published_at| recent?(published_at) }
-
-          latest = recent_releases.max_by do |r, published_at|
-            tag = r["tag_name"]
-            published = published_at || Time.at(0)
-            [ReleaseVersion.sort_key(tag), published]
+          current_release, previous_release, published_at = select_latest_release_pair(releases)
+          if current_release.nil? && strategy != "releases_only"
+            logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} release data empty; fallback to tags")
+            current_release, previous_release, published_at = select_latest_tag_pair(owner, repo)
           end
-          next unless latest
+          next nil unless current_release
 
-          release, published_at = latest
-          previous_release = find_previous_release(releases, release)
+          current_release = current_release.dup
+          current_release["body"] = merge_release_notes(
+            owner: owner,
+            repo: repo,
+            current_release: current_release,
+            previous_release: previous_release,
+            repo_config: repo_config
+          )
 
-          items << Item.new(
-            title: "#{name} #{release['tag_name']} released",
-            url: release["html_url"],
+          Item.new(
+            title: "#{name} #{current_release['tag_name']} released",
+            url: current_release["html_url"],
             published_at: published_at,
-            body: build_release_context(owner, repo, release, previous_release),
+            body: build_release_context(owner, repo, current_release, previous_release),
             source: "GitHub - #{owner}/#{repo}"
           )
         end
 
-        items
+        repo_items.compact
       end
 
       private
@@ -105,9 +109,193 @@ module WebTechFeeder
       end
 
       def fetch_releases(owner, repo)
-        conn = build_connection(GITHUB_API_URL, headers: github_headers)
-        response = conn.get("/repos/#{owner}/#{repo}/releases", per_page: github_token_present? ? 100 : 15)
-        JSON.parse(response.body)
+        github_client.get_json("/repos/#{owner}/#{repo}/releases", per_page: github_token_present? ? 100 : 15)
+      end
+
+      def fetch_tags(owner, repo)
+        github_client.get_json("/repos/#{owner}/#{repo}/tags", per_page: github_token_present? ? 100 : MAX_TAGS_SCAN)
+      rescue Faraday::Error, JSON::ParserError => e
+        logger.warn("Failed to fetch tags for #{owner}/#{repo}: #{e.message}")
+        []
+      end
+
+      def select_latest_release_pair(releases)
+        return [nil, nil, nil] unless releases.is_a?(Array)
+
+        recent_releases = releases
+                          .map { |r| [r, safe_parse_time(r["published_at"])] }
+                          .select { |_r, published_at| recent?(published_at) }
+        latest = recent_releases.max_by do |r, published_at|
+          tag = r["tag_name"]
+          published = published_at || Time.at(0)
+          [ReleaseVersion.sort_key(tag), published]
+        end
+        return [nil, nil, nil] unless latest
+
+        release, published_at = latest
+        previous_release = find_previous_release(releases, release)
+        [release, previous_release, published_at]
+      end
+
+      def select_latest_tag_pair(owner, repo)
+        tags = fetch_tags(owner, repo)
+        return [nil, nil, nil] if tags.empty?
+
+        enriched = tags.first(MAX_TAGS_SCAN).map do |tag|
+          tag_name = tag["name"].to_s
+          published_at = fetch_tag_commit_time(owner, repo, tag)
+          [tag, published_at]
+        end.select { |_tag, published_at| recent?(published_at) }
+        return [nil, nil, nil] if enriched.empty?
+
+        latest_tag, published_at = enriched.max_by do |tag, at|
+          [ReleaseVersion.sort_key(tag["name"]), at || Time.at(0)]
+        end
+        sorted = enriched.sort_by do |tag, at|
+          [ReleaseVersion.sort_key(tag["name"]), at || Time.at(0)]
+        end.reverse
+        idx = sorted.index { |t, _at| t["name"].to_s == latest_tag["name"].to_s }
+        previous_tag = idx ? sorted[idx + 1]&.first : nil
+
+        current_release = {
+          "tag_name" => latest_tag["name"],
+          "body" => "",
+          "html_url" => "https://github.com/#{owner}/#{repo}/tree/#{latest_tag['name']}"
+        }
+        previous_release = previous_tag ? { "tag_name" => previous_tag["name"] } : nil
+        [current_release, previous_release, published_at]
+      end
+
+      def fetch_tag_commit_time(owner, repo, tag)
+        sha = tag.dig("commit", "sha").to_s
+        return nil if sha.empty?
+
+        cache_key = "#{owner}/#{repo}@#{sha}"
+        config.cache_fetch("gh_tag_commit_time", cache_key) do
+          commit = github_client.get_json("/repos/#{owner}/#{repo}/commits/#{sha}")
+          safe_parse_time(commit.dig("commit", "committer", "date"))
+        rescue Faraday::Error, JSON::ParserError
+          nil
+        end
+      end
+
+      def merge_release_notes(owner:, repo:, current_release:, previous_release:, repo_config:)
+        base_body = current_release["body"].to_s.strip
+        notes_excerpt = fetch_release_notes_excerpt(
+          owner: owner,
+          repo: repo,
+          current_tag: current_release["tag_name"],
+          previous_tag: previous_release&.dig("tag_name"),
+          repo_config: repo_config
+        )
+        return base_body if notes_excerpt.to_s.strip.empty?
+        return notes_excerpt if base_body.empty?
+
+        "#{base_body}\n\n#{notes_excerpt}"
+      end
+
+      def fetch_release_notes_excerpt(owner:, repo:, current_tag:, previous_tag:, repo_config:)
+        files = release_notes_files(repo_config)
+        files.each do |file_path|
+          content = fetch_repo_text_file(owner, repo, file_path)
+          next if content.to_s.strip.empty?
+
+          section = extract_version_section(content, current_tag, previous_tag)
+          next if section.to_s.strip.empty?
+
+          logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} release notes matched from #{file_path}")
+          return "Changelog (#{file_path}):\n#{truncate_body(section, max_length: 2500)}"
+        end
+        ""
+      end
+
+      def release_notes_files(repo_config)
+        files = repo_config[:release_notes_files]
+        return DEFAULT_RELEASE_NOTES_FILES unless files.is_a?(Array) && files.any?
+
+        files.map(&:to_s)
+      end
+
+      def release_strategy(repo_config)
+        raw = repo_config[:release_strategy].to_s.downcase
+        return "releases_only" if raw == "releases_only"
+        return "tags_only" if raw == "tags_only"
+
+        "auto"
+      end
+
+      def fetch_repo_text_file(owner, repo, path)
+        cache_key = "#{owner}/#{repo}:#{path}"
+        config.cache_fetch("gh_repo_text_file", cache_key) do
+          data = github_client.get_json("/repos/#{owner}/#{repo}/contents/#{path}")
+          next "" unless data.is_a?(Hash) && data["encoding"].to_s.downcase == "base64"
+
+          Base64.decode64(data["content"].to_s)
+        rescue Faraday::ResourceNotFound
+          ""
+        rescue Faraday::Error, JSON::ParserError
+          ""
+        end
+      end
+
+      def extract_version_section(text, current_tag, previous_tag)
+        current_variants = tag_variants(current_tag)
+        previous_variants = tag_variants(previous_tag)
+        lines = text.to_s.gsub("\r\n", "\n").split("\n")
+        return "" if lines.empty?
+
+        start_idx = find_version_start(lines, current_variants)
+        return "" unless start_idx
+
+        end_idx = find_version_end(lines, start_idx + 1, previous_variants)
+        slice = lines[start_idx...(end_idx || lines.length)]
+        slice.join("\n").strip
+      end
+
+      def find_version_start(lines, variants)
+        lines.each_with_index do |line, idx|
+          stripped = line.strip
+          next if stripped.empty?
+
+          return idx if variants.any? { |v| heading_match?(stripped, v) }
+        end
+        nil
+      end
+
+      def find_version_end(lines, from_idx, previous_variants)
+        idx = from_idx
+        while idx < lines.length
+          stripped = lines[idx].strip
+          if previous_variants.any? { |v| heading_match?(stripped, v) } ||
+             (looks_like_version_heading?(stripped) && (
+               stripped.start_with?("#") ||
+               (idx + 1 < lines.length && lines[idx + 1].strip.match?(/\A[-=]{3,}\z/))
+             ))
+            return idx
+          end
+          idx += 1
+        end
+        nil
+      end
+
+      def heading_match?(line, version_text)
+        clean = version_text.to_s.strip
+        return false if clean.empty?
+
+        escaped = Regexp.escape(clean)
+        line.match?(/\A(?:\#{1,6}\s*)?#{escaped}\s*\z/)
+      end
+
+      def looks_like_version_heading?(line)
+        line.match?(/\A(?:\#{1,6}\s*)?v?\d+\.\d+\.\d+(?:[-.\w]*)\z/)
+      end
+
+      def tag_variants(tag)
+        raw = tag.to_s.strip
+        return [] if raw.empty?
+
+        no_v = raw.sub(/\Av/i, "")
+        [raw, no_v, "v#{no_v}"].uniq
       end
 
       def find_previous_release(releases, current_release)
@@ -136,7 +324,7 @@ module WebTechFeeder
 
       def build_release_context(owner, repo, release, previous_release)
         sections = []
-        logger.info("#{cid_tag}[release-context] #{owner}/#{repo} tag=#{release['tag_name']} prev_tag=#{previous_release&.dig('tag_name') || 'n/a'}")
+        logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} tag=#{release['tag_name']} prev_tag=#{previous_release&.dig('tag_name') || 'n/a'}")
 
         body = release["body"].to_s.strip
         sections << "Release Notes:\n#{body}" unless body.empty?
@@ -146,11 +334,11 @@ module WebTechFeeder
 
         if config.deep_pr_crawl?
           refs = extract_references([body, compare].compact.join("\n"), owner: owner, repo: repo)
-          logger.info("#{cid_tag}[release-context] #{owner}/#{repo} extracted_refs=#{refs.size}")
+          logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} extracted_refs=#{refs.size}")
           linked = fetch_linked_references(owner, repo, refs)
           sections << linked if linked
         else
-          logger.info("#{cid_tag}[release-context] #{owner}/#{repo} deep PR crawl disabled; skip linked PR/Issue references")
+          logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} deep PR crawl disabled; skip linked PR/Issue references")
         end
 
         final_text = sections.join("\n\n")
@@ -160,14 +348,12 @@ module WebTechFeeder
       def fetch_compare_summary(owner, repo, previous_tag, current_tag)
         return nil if previous_tag.to_s.empty? || current_tag.to_s.empty?
 
-        conn = build_connection(GITHUB_API_URL, headers: github_headers)
-        resp = conn.get("/repos/#{owner}/#{repo}/compare/#{previous_tag}...#{current_tag}")
-        data = JSON.parse(resp.body)
+        data = github_client.get_json("/repos/#{owner}/#{repo}/compare/#{previous_tag}...#{current_tag}")
 
         commits = limit_for_no_token(data["commits"] || [], MAX_COMPARE_COMMITS)
         files = limit_for_no_token(data["files"] || [], MAX_COMPARE_FILES)
         filtered_files = section_filter_files(files)
-        logger.info("#{cid_tag}[compare] #{owner}/#{repo} #{previous_tag}...#{current_tag} commits=#{commits.size} files_raw=#{files.size} files_filtered=#{filtered_files.size} section=#{@section_key || 'general'}")
+        logger.info("#{cid_tag}#{styled_tag('compare')} #{owner}/#{repo} #{previous_tag}...#{current_tag} commits=#{commits.size} files_raw=#{files.size} files_filtered=#{filtered_files.size} section=#{@section_key || 'general'}")
 
         parts = []
         parts << "Compare: #{previous_tag}...#{current_tag}"
@@ -201,101 +387,54 @@ module WebTechFeeder
       end
 
       def extract_references(text, owner:, repo:)
-        raw = text.to_s
-        return [] if raw.strip.empty?
-
-        refs = []
-        refs.concat(extract_reference_numbers_from_urls(raw, owner, repo))
-        refs.concat(extract_reference_numbers_from_context(raw))
-        refs.concat(raw.scan(/\bGH-(\d{1,7})\b/i).flatten.map(&:to_i))
-
-        non_github_refs = raw.scan(/\b(?:ticket|trac|jira|redmine)\s+#(\d{1,7})\b/i).flatten.map(&:to_i)
-        refs = refs.uniq - non_github_refs
-        limit_for_no_token(refs, MAX_LINKED_REFERENCES)
-      end
-
-      def extract_reference_numbers_from_urls(text, owner, repo)
-        escaped_owner = Regexp.escape(owner.to_s)
-        escaped_repo = Regexp.escape(repo.to_s)
-        pattern = %r{https?://github\.com/#{escaped_owner}/#{escaped_repo}/(?:issues|pull)/(\d+)}i
-        text.scan(pattern).flatten.map(&:to_i)
-      end
-
-      def extract_reference_numbers_from_context(text)
-        pattern = /
-          \b(?:pr|pull\ request|pull|issue|fix(?:es|ed)?|close(?:s|d)?|resolve(?:s|d)?|ref(?:er(?:ence|ences|enced)?)?)\b
-          [^#\n]{0,50}
-          \#(\d{1,7})\b
-        /ix
-        text.scan(pattern).flatten.map(&:to_i)
+        WebTechFeeder::Github::ReferenceExtractor.extract(
+          text,
+          owner: owner,
+          repo: repo,
+          limit: (github_token_present? ? nil : MAX_LINKED_REFERENCES)
+        )
       end
 
       def fetch_linked_references(owner, repo, numbers)
         return nil if numbers.empty?
-        logger.info("#{cid_tag}[linked-refs] #{owner}/#{repo} resolving=#{numbers.size}")
+        logger.info("#{cid_tag}#{styled_tag('linked-refs')} #{owner}/#{repo} resolving=#{numbers.size}")
 
-        conn = build_connection(GITHUB_API_URL, headers: github_headers)
         blocks = []
 
         numbers.each do |number|
-          issue = fetch_issue(conn, owner, repo, number)
+          issue = fetch_issue(owner, repo, number)
           next unless issue
 
-          comments = fetch_issue_comments(conn, owner, repo, number)
+          comments = fetch_issue_comments(owner, repo, number)
           blocks << format_issue_block(issue, comments)
         end
 
         return nil if blocks.empty?
-        logger.info("#{cid_tag}[linked-refs] #{owner}/#{repo} resolved=#{blocks.size}")
+        logger.info("#{cid_tag}#{styled_tag('linked-refs')} #{owner}/#{repo} resolved=#{blocks.size}")
 
         "Linked PR/Issue references:\n#{blocks.join("\n\n")}"
       end
 
-      def fetch_issue(conn, owner, repo, number)
-        cache_fetch("gh_issue_meta", "#{owner}/#{repo}##{number}") do
-          resp = conn.get("/repos/#{owner}/#{repo}/issues/#{number}")
-          JSON.parse(resp.body)
-        end
-      rescue Faraday::ResourceNotFound
-        logger.info("#{cid_tag}[linked-refs] #{owner}/#{repo}##{number} not found (404), skip reference")
-        nil
-      rescue Faraday::Error, JSON::ParserError => e
-        logger.warn("Failed to fetch linked issue #{owner}/#{repo}##{number}: #{e.message}")
-        nil
+      def fetch_issue(owner, repo, number)
+        github_client.fetch_issue_meta(
+          owner,
+          repo,
+          number,
+          not_found_log: "[linked-refs] #{owner}/#{repo}##{number} not found (404), skip reference",
+          error_log: "Failed to fetch linked issue #{owner}/#{repo}##{number}"
+        )
       end
 
-      def fetch_issue_comments(conn, owner, repo, number)
-        mode = github_token_present? ? "full" : "limited"
-        cache_key = "#{owner}/#{repo}##{number}:#{mode}:max#{MAX_COMMENTS_PER_REFERENCE}"
-        cache_fetch("gh_issue_comments", cache_key) do
-          if github_token_present?
-            fetch_all_issue_comments(conn, owner, repo, number)
-          else
-            resp = conn.get("/repos/#{owner}/#{repo}/issues/#{number}/comments", per_page: MAX_COMMENTS_PER_REFERENCE)
-            JSON.parse(resp.body)
-          end
-        end
-      rescue Faraday::Error, JSON::ParserError => e
-        logger.warn("Failed to fetch linked issue comments #{owner}/#{repo}##{number}: #{e.message}")
-        []
-      end
-
-      def fetch_all_issue_comments(conn, owner, repo, number)
-        page = 1
-        all = []
-        logger.info("#{cid_tag}[linked-comments] #{owner}/#{repo}##{number} start full pagination")
-        loop do
-          resp = conn.get("/repos/#{owner}/#{repo}/issues/#{number}/comments", per_page: 100, page: page)
-          rows = JSON.parse(resp.body)
-          break if rows.empty?
-
-          all.concat(rows)
-          logger.info("#{cid_tag}[linked-comments] #{owner}/#{repo}##{number} page=#{page} fetched=#{rows.size} total=#{all.size}")
-          break if rows.size < 100
-
-          page += 1
-        end
-        all
+      def fetch_issue_comments(owner, repo, number)
+        github_client.fetch_issue_comments(
+          owner,
+          repo,
+          number,
+          max_no_token: MAX_COMMENTS_PER_REFERENCE,
+          pagination_log_tag: "linked-comments #{owner}/#{repo}##{number}",
+          error_log: "Failed to fetch linked issue comments #{owner}/#{repo}##{number}",
+          empty_on_error: []
+        )
       end
 
       def format_issue_block(issue, comments)
@@ -323,16 +462,6 @@ module WebTechFeeder
         block
       end
 
-      def github_headers
-        headers = { "Accept" => "application/vnd.github.v3+json" }
-        headers["Authorization"] = "Bearer #{config.github_token}" if config.github_token
-        headers
-      end
-
-      def github_token_present?
-        !config.github_token.to_s.strip.empty?
-      end
-
       def limit_for_no_token(arr, limit)
         return arr if github_token_present?
 
@@ -344,9 +473,10 @@ module WebTechFeeder
         SectionFileFilter.apply(files, patterns)
       end
 
-      def cache_fetch(namespace, key, &block)
-        config.cache_fetch(namespace, key, &block)
+      def styled_tag(name)
+        Utils::LogTagStyler.style(name)
       end
+
     end
   end
 end

@@ -2,6 +2,11 @@
 
 Records key design decisions and implementation direction for collaboration.
 
+Scope of this document:
+- Focus on architecture decisions, trade-offs, and rationale
+- Avoid repeating step-by-step setup/operations (covered by root `README.md`)
+- Avoid contributor workflow details (covered by `CONTRIBUTING.md`)
+
 ---
 
 ## 1. Email: Gmail API OAuth vs SMTP
@@ -179,6 +184,128 @@ Retry AI processing up to 3 times per category for any processing error.
 - Exponential backoff: 30s, 60s, 120s
 - Category-to-category pacing: 5 seconds
 - After retries are exhausted, fallback summary is used for that category
+
+---
+
+## 11. Shared GitHub Abstractions (DRY Refactor)
+
+### Decision
+
+Consolidate duplicated GitHub logic into shared modules:
+
+- `WebTechFeeder::Github::Client`
+- `WebTechFeeder::Github::ReferenceExtractor`
+
+### Rationale
+
+- GitHub API calls and reference parsing were duplicated across collectors and enrichers
+- Duplicate code increases drift risk (same rule implemented differently over time)
+- Shared abstractions reduce maintenance cost and make behavior consistent
+
+### Implementation
+
+- `Github::Client` is responsible for:
+  - Auth headers and token mode detection
+  - Shared fetch methods for issue/PR meta, comments, and PR files
+  - Full pagination flow for token mode
+  - Run-level cache integration (including cached `nil`)
+- `Github::ReferenceExtractor` is responsible for:
+  - Strict GitHub reference extraction (`URL`, context keyword + `#number`, `GH-<number>`)
+  - Excluding non-GitHub tracker patterns (for example `ticket #1234`)
+- Collectors/enrichers now consume these shared modules instead of owning duplicated helper methods.
+
+---
+
+## 12. Runtime Observability UX (ANSI/BBS Logging)
+
+### Decision
+
+Add visually distinctive startup/phase logs while keeping structured machine-readable context.
+
+### Rationale
+
+- Long runs produce dense logs; key milestones should be immediately recognizable
+- Better operator experience during dry-run validation and CI troubleshooting
+
+### Implementation
+
+- ANSI/BBS-style banners for `START`, `DONE`, `FAILED`, and `NO DATA`
+- Highlighted multiline runtime config block (provider/model/toggles/token/yjit)
+- Run timing footer with `started_at`, `finished_at`, `elapsed_seconds`, and status
+- Keep `cid` for correlation across collectors, enrichers, and processor logs
+
+---
+
+## 13. Parallel Collection and Output Stability
+
+### Decision
+
+Add configurable parallel collection for source-level and repo-level fetching, with deterministic output ordering.
+
+### Rationale
+
+- Collection is I/O-bound (GitHub/RSS/Redmine HTTP calls), so parallelism can reduce wall-clock time
+- Uncontrolled concurrency increases 403/429 risk; parallelism must be bounded and retry-aware
+- Parallel execution can produce non-deterministic item order, which hurts digest consistency
+
+### Implementation
+
+- New toggles:
+  - `COLLECT_PARALLEL=true|false`
+  - `MAX_COLLECT_THREADS` (source-level workers)
+  - `MAX_REPO_THREADS` (repo-level workers inside GitHub collectors)
+- Token-aware defaults:
+  - with token: `MAX_COLLECT_THREADS=4`, `MAX_REPO_THREADS=3`
+  - without token: `MAX_COLLECT_THREADS=2`, `MAX_REPO_THREADS=2`
+- GitHub client adds exponential backoff retry for rate-limit responses:
+  - retry on `429` and rate-limit flavored `403` (including secondary rate limit)
+  - backoff is exponential with capped wait time
+- Final category item list applies stable sort after collection:
+  - primary key: `published_at` desc
+  - tie-breakers: title/source/url
+
+---
+
+## 14. Service-Oriented Pipeline Split (Phase 3)
+
+### Decision
+
+Split the previous monolithic orchestrator into dedicated service objects.
+
+### Rationale
+
+- Pipeline orchestration, collection orchestration, and digest shaping are separate concerns
+- Smaller classes improve readability, testability, and change isolation
+- Keeping `WebTechFeeder.run` as a thin entrypoint lowers coupling at startup boundaries
+
+### Implementation
+
+- `WebTechFeeder.run` now delegates to `Services::DigestPipeline`
+- Collection flow moved to `Services::CategoryCollector`
+- Post-AI filtering/splitting moved to `Services::DigestFilter`
+- Shared limits extracted to `lib/digest_limits.rb`
+
+---
+
+## 15. Log Presentation Refinement (Phase 3.1)
+
+### Decision
+
+Extract pipeline log rendering into a reusable formatter and reduce repetitive run-id noise.
+
+### Rationale
+
+- Pipeline class should focus on workflow, not ANSI/banner formatting internals
+- Repeating the same CID on every nearby line hurts readability
+- Colored tags improve scan speed for compare/link/cache heavy logs
+
+### Implementation
+
+- Added `Utils::LogFormatter` for:
+  - Startup/final banners, phase markers, runtime config, run timing
+  - Dry-run preview highlight output
+- Added `Utils::LogTagStyler` for colorized tags (for example `pr-files`, `linked-refs`, compare-related tags)
+- Runtime/collection logs now avoid repeating CID on every adjacent line while keeping run-level context at key points
 
 ---
 

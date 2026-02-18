@@ -41,4 +41,5 @@ jobs:
           EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
           EMAIL_TO: ${{ secrets.EMAIL_TO }}
           EMAIL_BCC: ${{ secrets.EMAIL_BCC }}
+          RUBY_YJIT_ENABLE: "1"
         run: bundle exec ruby bin/generate_digest
