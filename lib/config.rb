@@ -2,17 +2,23 @@
 
 require "yaml"
 require "logger"
+require "thread"
+require_relative "utils/log_context"
 
 module WebTechFeeder
   # Loads and provides access to application configuration
   class Config
     SOURCES_PATH = File.expand_path("sources.yml", __dir__)
+    TPE_UTC_OFFSET = "+08:00"
 
     attr_reader :sources, :logger
+    attr_accessor :run_id
 
     def initialize
       @sources = YAML.safe_load_file(SOURCES_PATH, symbolize_names: true)
       @logger = build_logger
+      @runtime_cache = {}
+      @runtime_cache_mutex = Mutex.new
     end
 
     def github_token
@@ -94,13 +100,87 @@ module WebTechFeeder
       ENV.fetch("LOOKBACK_DAYS", "7").to_i
     end
 
+    # Use Taiwan (TPE, UTC+8) as the date boundary for full-day lookback.
+    # Example: if now is 2026-02-17 xx:xx in TPE and lookback_days=7,
+    # cutoff is 2026-02-10 00:00:00 +08:00.
     def cutoff_time
-      Time.now - (lookback_days * 24 * 60 * 60)
+      now_tpe = Time.now.getlocal(TPE_UTC_OFFSET)
+      midnight_tpe = Time.new(now_tpe.year, now_tpe.month, now_tpe.day, 0, 0, 0, TPE_UTC_OFFSET)
+      midnight_tpe - (lookback_days * 24 * 60 * 60)
     end
 
     # Minimum importance: "critical" | "high" | "medium" | "low" (default: "high")
     def digest_min_importance
       ENV.fetch("DIGEST_MIN_IMPORTANCE", "high")
+    end
+
+    # Toggle deep PR crawling (PR compare + linked PR resolution).
+    # Set false to speed up experiments.
+    def deep_pr_crawl?
+      ENV.fetch("DEEP_PR_CRAWL", "true").downcase == "true"
+    end
+
+    # Show CID on verbose collector/client logs.
+    # Default false to reduce visual noise because one run uses one CID.
+    def verbose_cid_logs?
+      ENV.fetch("VERBOSE_CID_LOGS", "false").downcase == "true"
+    end
+
+    # Show thread id on verbose collector/client logs.
+    # Useful when debugging parallel fetch behavior.
+    def verbose_thread_logs?
+      ENV.fetch("VERBOSE_THREAD_LOGS", "false").downcase == "true"
+    end
+
+    # Toggle parallel data collection (I/O-bound source fetching).
+    def collect_parallel?
+      ENV.fetch("COLLECT_PARALLEL", "true").downcase == "true"
+    end
+
+    # Max worker threads for source-level parallel collection.
+    # Default is conservative without token, higher with token.
+    def max_collect_threads
+      default = github_token_present? ? 4 : 2
+      parse_positive_int(ENV.fetch("MAX_COLLECT_THREADS", default.to_s), default)
+    end
+
+    # Max worker threads per GitHub collector when processing multiple repos.
+    def max_repo_threads
+      default = github_token_present? ? 3 : 2
+      parse_positive_int(ENV.fetch("MAX_REPO_THREADS", default.to_s), default)
+    end
+
+    # Section-aware file path filters used by compare blocks.
+    # Returns an array of regex pattern strings for :frontend/:backend/:devops.
+    def section_file_filter_patterns(section_key)
+      return [] if section_key.nil?
+
+      filters = @sources[:section_file_filters] || {}
+      patterns = filters[section_key.to_sym]
+      patterns.is_a?(Array) ? patterns : []
+    end
+
+    # Run-level in-memory cache to avoid duplicated API calls.
+    # Caches nil values as well (e.g., 404) to suppress repeated retries.
+    def cache_fetch(namespace, key)
+      ns_key = namespace.to_s
+      entry_key = key.to_s
+
+      @runtime_cache_mutex.synchronize do
+        namespace_cache = (@runtime_cache[ns_key] ||= {})
+        if namespace_cache.key?(entry_key)
+          value = namespace_cache[entry_key]
+          logger.info("#{cid_tag}[cache-hit] #{ns_key} key=#{entry_key} value=#{cache_value_summary(value)}")
+          return value
+        end
+      end
+
+      value = yield
+
+      @runtime_cache_mutex.synchronize do
+        (@runtime_cache[ns_key] ||= {})[entry_key] = value
+      end
+      value
     end
 
     private
@@ -113,5 +193,37 @@ module WebTechFeeder
       end
       logger
     end
+
+    def cid_tag
+      Utils::LogContext.tag(
+        run_id: run_id,
+        show_cid: verbose_cid_logs?,
+        show_thread: verbose_thread_logs?
+      )
+    end
+
+    def cache_value_summary(value)
+      case value
+      when nil
+        "nil"
+      when Array
+        "Array(size=#{value.size})"
+      when Hash
+        keys = value.keys.first(3).map(&:to_s).join(",")
+        value.size > 3 ? "Hash(keys=#{keys},...)" : "Hash(keys=#{keys})"
+      else
+        value.class.to_s
+      end
+    end
+
+    def parse_positive_int(value, fallback)
+      num = value.to_i
+      num.positive? ? num : fallback
+    end
+
+    def github_token_present?
+      !github_token.to_s.strip.empty?
+    end
+
   end
 end

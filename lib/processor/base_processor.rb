@@ -2,13 +2,15 @@
 
 require "erb"
 require "json"
+require_relative "../utils/item_type_inferrer"
+require_relative "../utils/text_truncator"
 
 module WebTechFeeder
   module Processor
     # Shared logic for all AI processors: prompt building, fallback, category iteration.
     # Subclasses only need to implement #call_api(prompt) -> parsed JSON hash.
     class BaseProcessor
-      RATE_LIMIT_DELAY = 15
+      RATE_LIMIT_DELAY = 5
       MAX_RETRIES = 3
       ITEMS_LIMIT_FOR_AI = 15
       FALLBACK_ITEMS_LIMIT = 5
@@ -65,25 +67,24 @@ module WebTechFeeder
       def process_category(category, items)
         limited = items.take(ITEMS_LIMIT_FOR_AI)
         prompt = build_category_prompt(category, limited)
-        text = call_api_with_retry(prompt)
-        parse_response_text(text, category)
-      rescue StandardError => e
-        logger.error("AI processing failed for #{category}: #{e.message}")
-        fallback_category(category, items)
-      end
-
-      def call_api_with_retry(prompt)
         retries = 0
-        loop do
-          return call_api(prompt)
-        rescue Faraday::TooManyRequestsError, Faraday::ServerError, RuntimeError => e
-          raise if e.is_a?(RuntimeError) && !e.message.to_s.match?(/(429|rate)/i)
-
+        begin
+          text = call_api(prompt)
+          parse_response_text(text, category)
+        rescue StandardError => e
           retries += 1
-          raise if retries > MAX_RETRIES
+          reason = "#{e.class}: #{e.message}"
+          if retries <= MAX_RETRIES
+            wait = 30 * (2**(retries - 1))
+            logger.warn("AI processing error for #{category}. Retry #{retries}/#{MAX_RETRIES} in #{wait}s. reason=#{reason[0..200]}")
+            sleep(wait)
+            retry
+          end
 
-          sleep(30 * (2**(retries - 1)))
-          logger.warn("API error. Retry #{retries}/#{MAX_RETRIES}: #{e.message[0..80]}")
+          bt = Array(e.backtrace).first(3)&.join(" | ")
+          logger.error("AI processing failed for #{category}. reason=#{reason}")
+          logger.error("AI processing backtrace for #{category}: #{bt}") if bt && !bt.empty?
+          fallback_category(category, items)
         end
       end
 
@@ -97,6 +98,9 @@ module WebTechFeeder
         ERB.new(template, trim_mode: "-").result(binding)
       end
 
+      # Per-item body truncation; enriched items (with comments) may be longer
+      BODY_TRUNCATE = 800
+
       def format_items(items)
         lines = []
         items.each do |item|
@@ -105,7 +109,10 @@ module WebTechFeeder
           lines << "  Published: #{item.published_at}"
           lines << "  Source: #{item.source}"
           body = item.body.to_s.strip
-          lines << "  Body: #{body.length > 200 ? "#{body[0..200]}..." : body}" if !body.empty?
+          if body.length.positive?
+            truncated = Utils::TextTruncator.truncate(body, max_length: BODY_TRUNCATE)
+            lines << "  Body: #{truncated}"
+          end
           lines << ""
         end
         lines.join("\n")
@@ -137,17 +144,7 @@ module WebTechFeeder
       end
 
       def infer_item_type(item)
-        title = (item[:title] || "").downcase
-        source = (item[:source_name] || "").downcase
-        if title.include?("released") || title.include?("release") || source.include?("/releases/")
-          "release"
-        elsif source.include?("advisory") || title.include?("cve") || title.include?("security")
-          "advisory"
-        elsif source.include?("issue") || source.include?("pr")
-          "issue"
-        else
-          "other"
-        end
+        Utils::ItemTypeInferrer.infer(item)
       end
 
       def try_parse_json(str)
@@ -233,17 +230,7 @@ module WebTechFeeder
       end
 
       def infer_item_type_from_raw(item)
-        title = item.title.to_s.downcase
-        source = item.source.to_s.downcase
-        if title.include?("released") || title.include?("release") || source.include?("/releases/")
-          "release"
-        elsif source.include?("advisory") || title.include?("cve") || title.include?("security")
-          "advisory"
-        elsif source.include?("issue") || source.include?("pr")
-          "issue"
-        else
-          "other"
-        end
+        Utils::ItemTypeInferrer.infer(item)
       end
 
       def clean_summary(body)

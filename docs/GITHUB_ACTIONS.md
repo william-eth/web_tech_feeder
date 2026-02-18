@@ -39,6 +39,7 @@ Add these in `Settings > Secrets and variables > Actions`:
 - **Schedule**: Every Monday 00:00 UTC (08:00 Taiwan)
 - **Manual**: Actions tab → Run workflow
 - **First run**: Execute manually at least once to activate the cron schedule
+- **Runtime**: Workflow enables YJIT by default via `RUBY_YJIT_ENABLE=1`
 
 ## Pushing Workflow Changes
 

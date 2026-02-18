@@ -162,13 +162,19 @@ module WebTechFeeder
         structured.any? ? structured : [[nil, text]]
       end
 
-      # Truncate text to max_length, appending "..." if truncated
+      # Truncate text to max_length, appending "..." if truncated.
+      # Prefers breaking at last space to avoid mid-word cuts (e.g. "strate..." -> "...").
       def truncate_text(text, max_length = 200)
         return "" if text.nil?
 
-        # Clean up: remove excessive whitespace, newlines
         cleaned = text.gsub(/\s+/, " ").strip
-        cleaned.length > max_length ? "#{cleaned[0...max_length]}..." : cleaned
+        return cleaned if cleaned.length <= max_length
+
+        cut = cleaned[0...max_length]
+        last_space = cut.rindex(/\s/)
+        # If truncation cuts mid-word, break at last space instead
+        cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
+        "#{cut}..."
       end
 
       # Shorten a URL for display (remove protocol, truncate path)
@@ -182,8 +188,8 @@ module WebTechFeeder
         CGI.escapeHTML(str.to_s)
       end
 
-      # Format summary content: escape HTML, convert ```...``` code blocks to <code> elements.
-      # Prevents layout breakage from code containing <, >, or long unbreakable strings.
+      # Format summary content: escape HTML, convert ```...``` to block code, `...` to inline code.
+      # Inline code gets gray background for markdown-like readability.
       def format_summary_content(text)
         return "" if text.to_s.strip.empty?
 
@@ -193,12 +199,155 @@ module WebTechFeeder
         parts.each_with_index do |part, i|
           if i.odd?
             code = part.strip.gsub(/\r\n|\r/, "\n")
-            result << '<code class="summary-code">' << code << "</code>"
+            result << '<code class="summary-code" style="' << block_code_style << '">' << code << "</code>"
           else
-            result << part
+            # Convert inline `text` to styled <code> (markdown-style)
+            result << part.gsub(/`([^`]+)`/) { "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{$1}</code>" }
           end
         end
         result
+      end
+
+      def page_body_style
+        "margin:0;padding:0;width:100%;font-family:ui-sans-serif,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;" \
+          "font-size:14px;line-height:1.6;color:#334155;background-color:#f1f5f9;"
+      end
+
+      def wrapper_style
+        "max-width:640px;margin:0 auto;padding:16px;"
+      end
+
+      def header_style
+        "background:#0f172a;color:#e2e8f0;padding:24px 24px;border-radius:6px 6px 0 0;"
+      end
+
+      def content_style
+        "background:#ffffff;padding:0;border-radius:0 0 6px 6px;border:1px solid #e2e8f0;border-top:none;"
+      end
+
+      def section_style
+        "padding:20px 24px;border-bottom:1px solid #e2e8f0;"
+      end
+
+      def section_header_style
+        "padding:0 0 16px 0;"
+      end
+
+      def section_title_style
+        "font-size:15px;font-weight:600;color:#0f172a;margin:0;display:inline;mso-line-height-rule:exactly;"
+      end
+
+      def section_count_style
+        "font-size:12px;color:#94a3b8;font-family:ui-monospace,monospace;margin-left:8px;"
+      end
+
+      def section_tag_style(section_key)
+        base = "display:inline-block;font-size:11px;font-family:ui-monospace,monospace;font-weight:600;" \
+               "padding:3px 8px;border-radius:4px;letter-spacing:0.5px;margin-right:8px;"
+        color = case section_key.to_sym
+                when :frontend then "background:#dbeafe;color:#1d4ed8;"
+                when :backend then "background:#fee2e2;color:#b91c1c;"
+                when :devops then "background:#dcfce7;color:#15803d;"
+                else "background:#e2e8f0;color:#475569;"
+                end
+        "#{base}#{color}"
+      end
+
+      def subsection_title_style
+        "font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;padding:14px 0 8px 0;mso-line-height-rule:exactly;"
+      end
+
+      def item_style(importance)
+        base = "padding:14px 16px;border-radius:4px;border:1px solid #e2e8f0;border-left:3px solid #94a3b8;background:#f8fafc;"
+        color = case importance.to_s.downcase
+                when "critical" then "border-left-color:#dc2626;background:#fef2f2;"
+                when "high" then "border-left-color:#ea580c;background:#fff7ed;"
+                when "medium" then "border-left-color:#2563eb;background:#eff6ff;"
+                else ""
+                end
+        "#{base}#{color}"
+      end
+
+      def item_title_style
+        "font-size:14px;font-weight:600;color:#0f172a;margin:0 0 6px 0;line-height:1.4;mso-line-height-rule:exactly;"
+      end
+
+      def item_title_link_style
+        "color:#0369a1;text-decoration:none;"
+      end
+
+      def importance_badge_style(importance)
+        base = "display:inline-block;font-size:10px;font-family:ui-monospace,monospace;font-weight:600;padding:2px 6px;" \
+               "border-radius:3px;text-transform:uppercase;letter-spacing:0.3px;vertical-align:middle;margin-left:8px;"
+        color = case importance.to_s.downcase
+                when "critical" then "background:#fecaca;color:#b91c1c;"
+                when "high" then "background:#fed7aa;color:#c2410c;"
+                when "medium" then "background:#bfdbfe;color:#1d4ed8;"
+                else "background:#cbd5e1;color:#475569;"
+                end
+        "#{base}#{color}"
+      end
+
+      def framework_badge_style
+        "display:inline-block;font-size:11px;font-family:ui-monospace,monospace;font-weight:500;padding:2px 8px;border-radius:3px;" \
+          "background:#e2e8f0;color:#475569;margin-right:8px;vertical-align:middle;"
+      end
+
+      def item_summary_style
+        "font-size:13px;color:#475569;margin:0 0 8px 0;line-height:1.55;word-break:break-word;overflow-wrap:anywhere;white-space:normal;mso-line-height-rule:exactly;"
+      end
+
+      def summary_part_style
+        "padding:0 0 8px 0;"
+      end
+
+      def summary_part_label_style
+        "font-size:12px;font-weight:600;color:#64748b;margin-bottom:3px;mso-line-height-rule:exactly;"
+      end
+
+      def summary_part_body_style
+        "word-break:break-word;overflow-wrap:anywhere;white-space:normal;mso-line-height-rule:exactly;"
+      end
+
+      def item_source_style
+        "font-size:11px;color:#94a3b8;margin:0;mso-line-height-rule:exactly;"
+      end
+
+      def item_source_link_style
+        "color:#64748b;text-decoration:none;"
+      end
+
+      def item_count_style
+        "display:inline-block;font-size:12px;font-family:ui-monospace,monospace;color:#cbd5e1;background:#1e293b;padding:4px 12px;border-radius:4px;margin-top:10px;font-weight:500;"
+      end
+
+      def date_range_style
+        "font-size:12px;color:#94a3b8;margin:0;mso-line-height-rule:exactly;"
+      end
+
+      def header_title_style
+        "margin:0 0 6px 0;font-size:18px;font-weight:600;font-family:ui-monospace,'SF Mono','Fira Code','Cascadia Code',monospace;letter-spacing:0.5px;mso-line-height-rule:exactly;"
+      end
+
+      def empty_state_style
+        "text-align:center;padding:24px;color:#94a3b8;font-size:13px;"
+      end
+
+      def footer_style
+        "text-align:center;padding:16px;font-size:11px;color:#94a3b8;"
+      end
+
+      def footer_link_style
+        "color:#64748b;text-decoration:none;"
+      end
+
+      def block_code_style
+        "display:block;font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:12px;background:#f1f5f9;" \
+          "border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;margin:6px 0;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;"
+      end
+
+      def inline_code_style
+        "font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:0.9em;background:#e2e8f0;color:#334155;padding:2px 6px;border-radius:3px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;"
       end
 
       def get_binding

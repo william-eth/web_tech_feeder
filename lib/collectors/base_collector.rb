@@ -3,6 +3,10 @@
 require "faraday"
 require "faraday/retry"
 require "json"
+require_relative "../github/client"
+require_relative "../utils/log_context"
+require_relative "../utils/parallel_executor"
+require_relative "../utils/text_truncator"
 
 module WebTechFeeder
   module Collectors
@@ -71,7 +75,48 @@ module WebTechFeeder
       def truncate_body(text, max_length: 1000)
         return "" if text.nil? || text.empty?
 
-        text.length > max_length ? "#{text[0...max_length]}..." : text
+        Utils::TextTruncator.truncate(text, max_length: max_length)
+      end
+
+      def cid_tag
+        Utils::LogContext.tag(
+          run_id: (config.respond_to?(:run_id) ? config.run_id : nil),
+          show_cid: (config.respond_to?(:verbose_cid_logs?) && config.verbose_cid_logs?),
+          show_thread: (config.respond_to?(:verbose_thread_logs?) && config.verbose_thread_logs?)
+        )
+      end
+
+      def github_client
+        @github_client ||= WebTechFeeder::Github::Client.new(
+          token: config.github_token,
+          logger: logger,
+          cache_provider: config,
+          run_id: (config.respond_to?(:run_id) ? config.run_id : nil)
+        )
+      end
+
+      def github_headers
+        github_client.headers
+      end
+
+      def github_token_present?
+        github_client.token_present?
+      end
+
+      # Order-preserving parallel map helper for I/O-heavy repo collection.
+      def parallel_map(items, max_threads:)
+        normalized_threads = [max_threads.to_i, 1].max
+        use_parallel = config.respond_to?(:collect_parallel?) &&
+                       config.collect_parallel? &&
+                       normalized_threads > 1 &&
+                       items.size > 1
+
+        Utils::ParallelExecutor.map(
+          items,
+          max_threads: normalized_threads,
+          parallel: use_parallel,
+          logger: logger
+        ) { |item| yield(item) }
       end
     end
   end

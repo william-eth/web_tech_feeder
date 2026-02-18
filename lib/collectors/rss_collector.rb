@@ -3,18 +3,21 @@
 require "time"
 require "feedjira"
 require_relative "base_collector"
+require_relative "../enrichers"
 
 module WebTechFeeder
   module Collectors
     # Fetches and parses RSS/Atom feeds, filtering entries from the past week.
+    # Enriches entries that link to Redmine issues or GitHub issues/PRs with full content + comments.
     class RssCollector < BaseCollector
       # Maximum number of redirects to follow
       MAX_REDIRECTS = 5
 
       # feeds: Array of { url:, name: } hashes
-      def initialize(config, feeds:)
+      def initialize(config, feeds:, section_key: nil)
         super(config)
         @feeds = feeds
+        @section_key = section_key
       end
 
       def collect
@@ -31,11 +34,14 @@ module WebTechFeeder
             published_at = entry_published_at(entry)
             next unless recent?(published_at)
 
+            entry_url = entry.url || entry.entry_id
+            body = enrich_or_extract(entry, entry_url)
+
             items << Item.new(
               title: entry.title&.strip,
-              url: entry.url || entry.entry_id,
+              url: entry_url,
               published_at: published_at,
-              body: truncate_body(extract_summary(entry)),
+              body: truncate_body(body, max_length: 4000),
               source: name
             )
           end
@@ -85,6 +91,34 @@ module WebTechFeeder
       def entry_published_at(entry)
         time = entry.published || entry.updated
         time.is_a?(Time) ? time : safe_parse_time(time)
+      end
+
+      # Enrich from Redmine/GitHub API when entry URL points to issue or PR; else use RSS summary
+      def enrich_or_extract(entry, entry_url)
+        return extract_summary(entry) if entry_url.to_s.strip.empty?
+
+        # Redmine: bugs.ruby-lang.org/issues/{id}
+        if Enrichers::RedmineEnricher.match?(entry_url)
+          enriched = Enrichers::RedmineEnricher.enrich(entry_url, logger: logger)
+          return enriched if enriched
+        end
+
+        # GitHub: issues or pull requests
+        if Enrichers::GithubEnricher.match?(entry_url)
+          enriched = Enrichers::GithubEnricher.enrich(
+            entry_url,
+            logger: logger,
+            github_token: config.github_token,
+            section_key: @section_key,
+            section_patterns: config.section_file_filter_patterns(@section_key),
+            run_id: config.run_id,
+            deep_pr_crawl: config.deep_pr_crawl?,
+            cache_provider: config
+          )
+          return enriched if enriched
+        end
+
+        extract_summary(entry)
       end
 
       # Extract a clean text summary from feed entry

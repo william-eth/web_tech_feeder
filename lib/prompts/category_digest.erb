@@ -25,6 +25,7 @@ BLOCK 3 — 📊 建議動作 (2-4 sentences):
   MUST include ALL applicable: (a) syntax/config changes to apply, (b) deprecated patterns to replace, (c) things to watch for in daily dev.
   MUST NOT be only "upgrade to vX.Y.Z".
   When code changes apply, wrap in ``` on its own line (1-5 lines max).
+  Code fences belong to BLOCK 3 content and do NOT count as an extra block.
 
 ## CONTENT-TYPE RULES
 
@@ -60,11 +61,18 @@ Example 3 (issue/PR):
 
 ## ITEM SELECTION
 
-1. Up to 7 items per category. Balance: releases + advisories + at least 1-2 Issue/PR/Blog.
-2. MUST include 1-2 items from GitHub Issues/PRs or RSS/Blog when available in raw data. Mark notable ones as "high".
+1. Up to 7 items per category. Balance: releases + advisories + at least 1-2 substantive Issue/PR/Blog items.
+2. Include 1-2 items from GitHub Issues/PRs or RSS/Blog when substantive candidates exist in raw data. Mark notable ones as "high".
 3. DEDUPLICATE: same vulnerability/release from multiple sources → ONE merged entry.
 4. ONE RELEASE PER PROJECT: multiple versions of same project → output only the latest.
 5. Skip only trivial, off-topic, or redundant content.
+
+## SECTION PERSPECTIVE (ROLE-BASED WRITING)
+
+- Frontend section: write from a frontend developer perspective. Prioritize UI behavior changes, browser/runtime impacts, framework routing/rendering/state management, DX/toolchain implications, and testing points relevant to frontend teams.
+- Backend section: write from a backend developer perspective. Prioritize API contracts, auth/session, DB/query behavior, background jobs, concurrency, data consistency, and operational risks in backend services.
+- DevOps section: write from a DevOps/SRE perspective. Prioritize deployment/rollback, infra compatibility, image/runtime changes, cluster/network/security impact, observability, and reliability/incident risk.
+- Recommendations MUST match the section perspective above (do not give generic advice detached from the section).
 
 ## FRAMEWORK TAGGING
 
