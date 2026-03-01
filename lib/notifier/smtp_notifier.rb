@@ -167,11 +167,11 @@ module WebTechFeeder
       def truncate_text(text, max_length = 200)
         return "" if text.nil?
 
-        cleaned = text.gsub(/\s+/, " ").strip
+        cleaned = text.to_s.gsub(/\r\n?/, "\n").strip
         return cleaned if cleaned.length <= max_length
 
         cut = cleaned[0...max_length]
-        last_space = cut.rindex(/\s/)
+        last_space = cut.rindex(" ")
         # If truncation cuts mid-word, break at last space instead
         cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
         "#{cut}..."
@@ -194,18 +194,24 @@ module WebTechFeeder
         return "" if text.to_s.strip.empty?
 
         escaped = escape_html(text)
-        parts = escaped.split(/```\s*/)
-        result = +""
-        parts.each_with_index do |part, i|
-          if i.odd?
-            code = part.strip.gsub(/\r\n|\r/, "\n")
-            result << '<code class="summary-code" style="' << block_code_style << '">' << code << "</code>"
-          else
-            # Convert inline `text` to styled <code> (markdown-style)
-            result << part.gsub(/`([^`]+)`/) { "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{$1}</code>" }
-          end
+        blocks = []
+        with_placeholders = escaped.gsub(/```([a-zA-Z0-9_+\-]*)\s*\n?(.*?)```/m) do
+          lang = normalize_code_lang(Regexp.last_match(1))
+          code = Regexp.last_match(2).to_s.strip.gsub(/\r\n?/, "\n")
+          idx = blocks.length
+          blocks << [lang, code]
+          "__CODE_BLOCK_#{idx}__"
         end
-        result
+
+        with_inline = with_placeholders.gsub(/`([^`\n]+)`/) do
+          "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{$1}</code>"
+        end
+
+        with_inline.gsub(/__CODE_BLOCK_(\d+)__/) do
+          idx = Regexp.last_match(1).to_i
+          lang, code = blocks[idx]
+          "<code class=\"summary-code summary-code-#{lang}\" style=\"#{block_code_style(lang)}\">#{code}</code>"
+        end
       end
 
       def page_body_style
@@ -341,13 +347,43 @@ module WebTechFeeder
         "color:#64748b;text-decoration:none;"
       end
 
-      def block_code_style
-        "display:block;font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:12px;background:#f1f5f9;" \
-          "border:1px solid #e2e8f0;border-radius:4px;padding:10px 12px;margin:6px 0;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;"
+      def block_code_style(lang = nil)
+        palette = code_style_palette(lang)
+        "display:block;font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:12px;" \
+          "background:#{palette[:bg]};color:#{palette[:fg]};border:1px solid #{palette[:border]};" \
+          "border-radius:6px;padding:10px 12px;margin:8px 0;line-height:1.5;white-space:pre-wrap;" \
+          "word-break:break-word;overflow-wrap:anywhere;"
       end
 
       def inline_code_style
         "font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:0.9em;background:#e2e8f0;color:#334155;padding:2px 6px;border-radius:3px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;"
+      end
+
+      def normalize_code_lang(lang)
+        raw = lang.to_s.strip.downcase
+        return "plain" if raw.empty?
+        return "ts" if %w[typescript tsx ts].include?(raw)
+        return "js" if %w[javascript jsx js].include?(raw)
+        return "shell" if %w[shell sh bash zsh].include?(raw)
+        return "yaml" if %w[yaml yml].include?(raw)
+        return "ruby" if raw == "rb"
+
+        raw
+      end
+
+      def code_style_palette(lang)
+        case normalize_code_lang(lang)
+        when "ruby"
+          { bg: "#fff7ed", fg: "#7c2d12", border: "#fdba74" }
+        when "ts", "js"
+          { bg: "#eff6ff", fg: "#1e3a8a", border: "#93c5fd" }
+        when "shell"
+          { bg: "#ecfeff", fg: "#155e75", border: "#67e8f9" }
+        when "yaml"
+          { bg: "#f5f3ff", fg: "#4c1d95", border: "#c4b5fd" }
+        else
+          { bg: "#f1f5f9", fg: "#334155", border: "#e2e8f0" }
+        end
       end
 
       def get_binding

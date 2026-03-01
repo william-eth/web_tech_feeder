@@ -2,6 +2,8 @@
 
 require "time"
 require "base64"
+require "uri"
+require "cgi"
 require_relative "base_collector"
 require_relative "../section_file_filter"
 require_relative "../github/reference_extractor"
@@ -39,6 +41,7 @@ module WebTechFeeder
       MAX_COMMENTS_PER_REFERENCE = 8
       MAX_ENRICHED_BODY = 6_000
       MAX_TAGS_SCAN = 20
+      MAX_EXTERNAL_NOTE_URLS = 2
       DEFAULT_RELEASE_NOTES_FILES = %w[CHANGELOG.md CHANGES.md Changes.md HISTORY.md RELEASE_NOTES.md].freeze
 
       # repos: Array of { owner:, repo:, name: } hashes
@@ -181,17 +184,23 @@ module WebTechFeeder
 
       def merge_release_notes(owner:, repo:, current_release:, previous_release:, repo_config:)
         base_body = current_release["body"].to_s.strip
-        notes_excerpt = fetch_release_notes_excerpt(
+        local_notes_excerpt = fetch_release_notes_excerpt(
           owner: owner,
           repo: repo,
           current_tag: current_release["tag_name"],
           previous_tag: previous_release&.dig("tag_name"),
           repo_config: repo_config
         )
-        return base_body if notes_excerpt.to_s.strip.empty?
-        return notes_excerpt if base_body.empty?
+        external_notes_excerpt = fetch_external_release_notes_excerpt(
+          owner: owner,
+          repo: repo,
+          current_tag: current_release["tag_name"],
+          release_body: base_body,
+          repo_config: repo_config
+        )
 
-        "#{base_body}\n\n#{notes_excerpt}"
+        sections = [base_body, local_notes_excerpt, external_notes_excerpt].map(&:to_s).map(&:strip).reject(&:empty?)
+        sections.join("\n\n")
       end
 
       def fetch_release_notes_excerpt(owner:, repo:, current_tag:, previous_tag:, repo_config:)
@@ -207,6 +216,114 @@ module WebTechFeeder
           return "Changelog (#{file_path}):\n#{truncate_body(section, max_length: 2500)}"
         end
         ""
+      end
+
+      def fetch_external_release_notes_excerpt(owner:, repo:, current_tag:, release_body:, repo_config:)
+        urls = external_release_note_urls(release_body, repo_config)
+        return "" if urls.empty?
+
+        urls.each do |url|
+          text = fetch_external_release_note_text(url, owner: owner, repo: repo)
+          next if text.to_s.strip.empty?
+
+          excerpt = extract_external_release_excerpt(text, current_tag)
+          next if excerpt.to_s.strip.empty?
+
+          logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} external notes matched from #{url}")
+          return "External Release Notes (#{url}):\n#{truncate_body(excerpt, max_length: 2200)}"
+        end
+        ""
+      end
+
+      def external_release_note_urls(release_body, repo_config)
+        body_urls = extract_urls(release_body)
+        candidates = body_urls.uniq
+        return [] if candidates.empty?
+
+        allowed_domains = Array(repo_config[:release_notes_domains]).map(&:to_s).map(&:downcase).reject(&:empty?)
+        if allowed_domains.any?
+          candidates = candidates.select do |url|
+            host = parse_host(url)
+            next false if host.empty?
+
+            allowed_domains.any? { |d| host == d || host.end_with?(".#{d}") }
+          end
+        end
+
+        ranked = candidates.sort_by do |url|
+          lower = url.downcase
+          rank = if lower.match?(/announce|announcement|release-?notes?|what'?s-?new|devblog|blog/)
+                   0
+                 else
+                   1
+                 end
+          [rank, url.length]
+        end
+        ranked.first(MAX_EXTERNAL_NOTE_URLS)
+      end
+
+      def extract_urls(text)
+        text.to_s.scan(%r{https?://[^\s\)>\]]+}).map do |u|
+          u.gsub(/[.,;:!?]+\z/, "")
+        end.uniq
+      end
+
+      def parse_host(url)
+        URI.parse(url).host.to_s.downcase
+      rescue URI::InvalidURIError
+        ""
+      end
+
+      def fetch_external_release_note_text(url, owner:, repo:)
+        cache_key = "#{owner}/#{repo}:#{url}"
+        config.cache_fetch("gh_external_release_notes", cache_key) do
+          uri = URI.parse(url)
+          return "" unless %w[http https].include?(uri.scheme)
+
+          conn = build_connection(
+            "#{uri.scheme}://#{uri.host}",
+            headers: { "Accept" => "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8" }
+          )
+          path = uri.path.to_s.empty? ? "/" : uri.path
+          path_with_query = uri.query.to_s.empty? ? path : "#{path}?#{uri.query}"
+          resp = conn.get(path_with_query)
+          html_to_text(resp.body.to_s)
+        rescue URI::InvalidURIError
+          ""
+        rescue Faraday::Error => e
+          logger.warn("Failed to fetch external release notes #{url}: #{e.message}")
+          ""
+        end
+      end
+
+      def html_to_text(html)
+        return "" if html.to_s.strip.empty?
+
+        plain = html.dup
+        plain.gsub!(%r{<script.*?</script>}mi, " ")
+        plain.gsub!(%r{<style.*?</style>}mi, " ")
+        plain.gsub!(%r{<[^>]+>}, " ")
+        plain = CGI.unescapeHTML(plain)
+        plain.gsub(/\s+/, " ").strip
+      end
+
+      def extract_external_release_excerpt(text, current_tag)
+        clean = text.to_s.strip
+        return "" if clean.empty?
+
+        version_hints = external_version_hints(current_tag).reject(&:empty?)
+        pos = version_hints.filter_map { |hint| clean.downcase.index(hint.downcase) }.min
+        return "" unless pos
+
+        start = [pos - 700, 0].max
+        clean[start, 2600].to_s
+      end
+
+      def external_version_hints(current_tag)
+        variants = tag_variants(current_tag)
+        no_v = current_tag.to_s.sub(/\Av/i, "")
+        major_minor = no_v.split(".")[0, 2].join(".")
+        variants + [no_v, major_minor, no_v.tr("-", " ")]
       end
 
       def release_notes_files(repo_config)

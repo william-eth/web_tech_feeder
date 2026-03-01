@@ -26,9 +26,13 @@ frontend:
     - owner: microsoft
       repo: TypeScript
       name: TypeScript
+      release_notes_domains:
+        - devblogs.microsoft.com
     - owner: facebook
       repo: react
       name: React
+      release_notes_domains:
+        - react.dev
     - owner: vercel
       repo: next.js
       name: Next.js
@@ -192,6 +196,9 @@ devops:
     - owner: argoproj
       repo: argo-cd
       name: ArgoCD
+      release_notes_domains:
+        - argo-cd.readthedocs.io
+        - blog.argoproj.io
     - owner: moby
       repo: moby
       name: Docker Engine
