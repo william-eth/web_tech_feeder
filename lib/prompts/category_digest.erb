@@ -21,10 +21,15 @@ BLOCK 2 — 🔍 技術細節 (3-5 sentences):
     ❌ "改善與其他 Rails 元件的相容性" → which components? what scenario?
   ✅ "修正 Devise/Warden 在 OmniAuth callback 後 session 未正確寫入；觸發情境：透過 Google OAuth 登入後 redirect 回應用時 session 為空。原因：Rails 7.1 `config.session_store` 預設值變更，`:cookie_store` 搭配不完整 domain 設定時觸發。"
 
-BLOCK 3 — 📊 建議動作 (2-4 sentences):
+BLOCK 3 — 📊 建議動作 (3-6 sentences):
   MUST include ALL applicable: (a) syntax/config changes to apply, (b) deprecated patterns to replace, (c) things to watch for in daily dev.
   MUST NOT be only "upgrade to vX.Y.Z".
-  When code changes apply, wrap in ``` on its own line (1-5 lines max).
+  Use one of these modes:
+    - Action mode (change needed now): include at least one concrete action (command OR code/config patch), plus one validation step (test/check/log).
+    - Awareness mode (no immediate change needed): do NOT force commands; instead include impact check scope, trigger condition for action, and what to monitor next.
+  When code changes apply, include one minimal copy-paste snippet for migration (config/code patch).
+  When using code fences, prefer explicit language tags for simple highlighting (`ruby`, `ts`, `js`, `shell`, `yaml`).
+  When code changes apply, wrap in ``` on its own line (4-12 lines preferred).
   Code fences belong to BLOCK 3 content and do NOT count as an extra block.
 
 ## CONTENT-TYPE RULES

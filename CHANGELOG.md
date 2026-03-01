@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-03-02
+
+### Added
+- **GitHub rate-limit telemetry**: Added `[gh-rate]` snapshots from response headers (`resource`, `remaining/limit`, `used`, `reset_at`, `retry_after`) and attached the same snapshot to rate-limit retry warnings for easier diagnosis.
+- **Release-note domain enrichments**: Added `release_notes_domains` coverage for TypeScript (`devblogs.microsoft.com`), React (`react.dev`), and Argo CD (`argo-cd.readthedocs.io`, `blog.argoproj.io`) so release-body links can pull richer external context.
+
+### Changed
+- **External release-note strategy**: Removed `release_notes_urls` behavior and standardized external enrichment to release-body URL discovery + domain allowlist only.
+- **Prompt actionability balance**: Updated `📊 建議動作` to support Action mode / Awareness mode, reducing forced commands when no immediate execution is needed while keeping concrete migration guidance when changes are required.
+- **Code hint readability**: Prompt now prefers explicit fenced-code language tags (`ruby`, `ts`, `js`, `shell`, `yaml`) to improve downstream code presentation.
+
+### Fixed
+- **Summary code-block rendering**: Preserved line breaks during truncation and improved fenced-code parsing to avoid flattened one-line blocks in email output.
+- **Language-aware code styling**: Added lightweight per-language code-block palettes (Ruby/TS/JS/Shell/YAML) with a safe fallback to improve scanability without full syntax-highlighting dependencies.
+
 ## [1.0.0] - 2026-02-18
 
 ### Added
@@ -131,7 +146,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...HEAD
+[1.0.1]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...1.0.0
 [0.1.5]: https://github.com/william-eth/web_tech_feeder/compare/0.1.4...0.1.5
 [0.1.4]: https://github.com/william-eth/web_tech_feeder/compare/0.1.3...0.1.4

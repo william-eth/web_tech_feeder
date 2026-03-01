@@ -15,6 +15,7 @@ module WebTechFeeder
       RATE_LIMIT_MAX_RETRIES = 4
       RATE_LIMIT_BASE_WAIT_SECONDS = 2
       RATE_LIMIT_MAX_WAIT_SECONDS = 120
+      RATE_LIMIT_LOG_THRESHOLD = 500
 
       def initialize(token:, logger: nil, cache_provider: nil, run_id: nil)
         @token = token.to_s
@@ -36,6 +37,7 @@ module WebTechFeeder
       def get_json(path, params = {})
         with_rate_limit_retry(path) do
           resp = connection.get(path, params)
+          maybe_log_rate_limit(path, resp.status, resp.headers)
           JSON.parse(resp.body)
         end
       end
@@ -146,9 +148,10 @@ module WebTechFeeder
           raise if retries > RATE_LIMIT_MAX_RETRIES
 
           wait = backoff_wait_seconds(retries, headers)
+          rate_snapshot = rate_limit_snapshot(headers)
           @logger&.warn(
             "#{cid_tag}GitHub rate limit hit status=#{status} path=#{path} " \
-            "retry=#{retries}/#{RATE_LIMIT_MAX_RETRIES} wait=#{wait}s"
+            "retry=#{retries}/#{RATE_LIMIT_MAX_RETRIES} wait=#{wait}s #{rate_snapshot}"
           )
           sleep(wait)
           retry
@@ -192,6 +195,46 @@ module WebTechFeeder
       def bounded_wait(seconds)
         jitter = rand(0.0..1.2)
         [[seconds + jitter, 1.0].max, RATE_LIMIT_MAX_WAIT_SECONDS].min.round
+      end
+
+      def maybe_log_rate_limit(path, status, headers)
+        limit = header_int(headers, "x-ratelimit-limit")
+        remaining = header_int(headers, "x-ratelimit-remaining")
+        return unless limit && remaining
+        return unless remaining <= RATE_LIMIT_LOG_THRESHOLD || status.to_i == 403 || status.to_i == 429
+
+        @logger&.info("#{cid_tag}[gh-rate] status=#{status} path=#{path} #{rate_limit_snapshot(headers)}")
+      end
+
+      def rate_limit_snapshot(headers)
+        resource = header_value(headers, "x-ratelimit-resource")
+        limit = header_value(headers, "x-ratelimit-limit")
+        remaining = header_value(headers, "x-ratelimit-remaining")
+        used = header_value(headers, "x-ratelimit-used")
+        retry_after = header_value(headers, "retry-after")
+        reset_raw = header_value(headers, "x-ratelimit-reset")
+        reset_at = format_reset_time(reset_raw)
+        "resource=#{resource || 'n/a'} remaining=#{remaining || 'n/a'}/#{limit || 'n/a'} " \
+          "used=#{used || 'n/a'} reset_at=#{reset_at || 'n/a'} retry_after=#{retry_after || 'n/a'}"
+      end
+
+      def format_reset_time(reset_value)
+        return nil unless reset_value.to_s.match?(/\A\d+\z/)
+
+        Time.at(reset_value.to_i).utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+      rescue StandardError
+        nil
+      end
+
+      def header_int(headers, key)
+        raw = header_value(headers, key)
+        return nil unless raw.to_s.match?(/\A\d+\z/)
+
+        raw.to_i
+      end
+
+      def header_value(headers, key)
+        headers[key] || headers[key.upcase] || headers[key.split("-").map(&:capitalize).join("-")]
       end
 
       def cache_fetch(namespace, key, &block)

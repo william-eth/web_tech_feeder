@@ -205,6 +205,7 @@ Edit `lib/sources.yml`:
 - **github_releases**: `owner`, `repo`, `name` (optional: `release_strategy`, `release_notes_files`)
   - `release_strategy`: `auto` (default), `releases_only`, `tags_only`
   - `release_notes_files`: optional list of changelog-like files (e.g. `Changes.md`, `CHANGELOG.md`) used to enrich sparse release/tag notes
+  - `release_notes_domains`: optional domain allowlist for external announcement/release-note links found in release body
 - **github_issues**: `owner`, `repo`, `name`
 - **rss_feeds**: `url`, `name`
 - **rubygems**: gem names
