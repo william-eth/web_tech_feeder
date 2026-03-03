@@ -33,12 +33,19 @@ Use **Gmail API + OAuth 2.0 Refresh Token** instead of SMTP + app password.
 
 ### Decision
 
-Each item has three blocks: **📌 Core point / 🔍 Technical details / 📊 Recommended actions**, 2–4 sentences per block.
+Each item has three blocks: **📌 Core point / 🔍 Technical details / 📊 Recommended actions** with block-specific depth (typically 2–6 sentences), and `📊` uses Action/Awareness modes based on urgency.
 
 ### Rationale
 
 - Consistent structure for quick scanning
 - Avoid one-liners; provide enough detail for readers to understand impact and next steps
+- Prevent over-prescriptive output: only require commands/config patches when immediate change is necessary
+
+### Implementation Notes
+
+- **Action mode**: include at least one concrete action (command or code/config patch) plus one validation step (test/check/log)
+- **Awareness mode**: avoid forced commands; state impact-check scope, trigger condition for future action, and monitoring focus
+- When code is included in `📊`, use explicit fence language tags (`ruby`, `ts`, `js`, `shell`, `yaml`) for readability
 
 ### Content-Type Variations
 
@@ -73,18 +80,48 @@ Show framework/package badge (e.g. Rails, Node.js) for each item in the "Other u
 
 ### Decision
 
-Add `github_advisories` to DevOps section using **Go ecosystem**.
+Use a two-layer security source strategy for DevOps:
+
+- `github_advisories` for **Go ecosystem** packages
+- `github_repo_advisories` for repository-level advisories on C/server projects (e.g. Valkey, PostgreSQL, Redis, Nginx)
 
 ### Rationale
 
-- Common DevOps tools (Kubernetes, Terraform, containerd, Docker CLI) are written in Go
-- GitHub Advisory Database supports Go; filter by Go module path
+- Common DevOps tools (Kubernetes, Terraform, containerd, Docker CLI, Helm, Grafana, ArgoCD) are written in Go
+- GitHub Advisory Database supports Go ecosystem filtering by module path
+- Some infrastructure/server projects publish advisories at repository level and are not reliably covered by ecosystem package filters
 
 ### Packages
 
 ```yaml
 ecosystem: go
-packages: [github.com/containerd/containerd, github.com/opencontainers/runc, k8s.io/kubernetes, github.com/hashicorp/terraform, github.com/docker/cli]
+packages:
+  - github.com/containerd/containerd
+  - github.com/opencontainers/runc
+  - k8s.io/kubernetes
+  - github.com/hashicorp/terraform
+  - github.com/opentofu/opentofu
+  - github.com/docker/cli
+  - github.com/moby/moby
+  - helm.sh/helm/v3
+  - github.com/grafana/grafana
+  - github.com/argoproj/argo-cd/v2
+```
+
+```yaml
+github_repo_advisories:
+  - owner: valkey-io
+    repo: valkey
+    name: Valkey
+  - owner: postgres
+    repo: postgres
+    name: PostgreSQL
+  - owner: redis
+    repo: redis
+    name: Redis
+  - owner: nginx
+    repo: nginx
+    name: Nginx
 ```
 
 ---

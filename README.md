@@ -40,7 +40,7 @@ flowchart LR
 
 1. **Trigger**: GitHub Actions runs every Monday 08:00 (UTC+8)
 2. **Collect**: Ruby collectors fetch from GitHub Releases, Issues/PRs, RSS, RubyGems, GitHub Advisories
-3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 Core point / 🔍 Technical details / 📊 Recommended actions, 2–4 sentences each)
+3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 Core point / 🔍 Technical details / 📊 Recommended actions); depth is block-specific (typically 2–6 sentences), and Recommended actions supports Action/Awareness modes
 4. **Notify**: HTML email via Gmail API (OAuth 2.0 refresh token); supports dry-run preview to `tmp/digest_preview.html`
 
 ## Data Sources
@@ -49,20 +49,20 @@ flowchart LR
 - **Releases**: Node.js, TypeScript, React, Next.js (GitHub API, latest version per repo)
 - **Issues/PRs**: Community discussions from above repos
 - **RSS**: Node.js Blog, Node.js Security Advisories, JavaScript Weekly, Node Weekly
-- **Security**: npm advisories (node, react, next, typescript)
+- **Security**: npm advisories (node, react, next, typescript) and repository-level advisories (React, Next.js)
 
 ### Backend
 - **Releases**: Go, Ruby, Rails, pg, Puma, redis-rb, Faraday, Sidekiq, ruby-jwt, Doorkeeper, Devise
 - **Issues/PRs**: Community discussions from above repos
 - **RubyGems**: pg, puma, redis, faraday, sidekiq, jwt, doorkeeper, devise
 - **RSS**: The Go Blog, Ruby Official News, Rails Security Announcements, Ruby Redmine, Rails Blog, Ruby Weekly
-- **Security**: RubyGems advisories
+- **Security**: RubyGems advisories and repository-level advisories (Ruby on Rails)
 
 ### DevOps
-- **Releases**: PostgreSQL (server), Redis (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
+- **Releases**: PostgreSQL (server), Redis (server), Valkey (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
 - **Issues/PRs**: Community discussions from above repos
 - **RSS**: Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, HashiCorp Security Bulletins, AWS News, AWS Security, Kubernetes Blog
-- **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, Docker CLI)
+- **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, OpenTofu, Docker Engine/CLI, Helm, Grafana, ArgoCD) and repository-level advisories (Valkey, PostgreSQL, Redis, Nginx)
 
 ## Prerequisites
 
@@ -120,8 +120,11 @@ To obtain the refresh token: create OAuth 2.0 credentials in [Google Cloud Conso
 ### 3. Run
 
 ```bash
-# Preview (no email, saves to tmp/digest_preview.html)
+# Preview (no email, saves to tmp/digest_preview.html and tmp/collected_raw_data.json)
 DRY_RUN=true bundle exec ruby bin/generate_digest
+
+# Quick prompt/template iteration: skip collection, use cached data
+DRY_RUN_FROM_CACHE=true bundle exec ruby bin/generate_digest
 
 # Send email
 bundle exec ruby bin/generate_digest
@@ -184,7 +187,7 @@ For file-level mapping and change entrypoints, see `docs/CONTRIBUTING.md`.
 | `RUBY_YJIT_ENABLE` | unset | Set `1` to enable YJIT (Ruby 3.1+) |
 | `DIGEST_MIN_IMPORTANCE` | `high` | `high`, `medium`, or `low` |
 | `AI_MAX_TOKENS` | `16384` | Max completion/output tokens |
-| `AI_USE_MAX_COMPLETION_TOKENS` | auto | Set `true` if model rejects `max_tokens` (e.g. GPT-5.x, o1); auto-detected for `gpt-5*`, `o1-*`, `o3-*` |
+| `AI_USE_MAX_COMPLETION_TOKENS` | `auto` | Set `true` if model rejects `max_tokens` (e.g. GPT-5.x, o1); auto-detected for `gpt-5*`, `o1-*`, `o3-*` |
 
 AI processing reliability:
 - Retries up to 3 times per category on any processing error (API/network/empty response/invalid JSON)
@@ -193,6 +196,7 @@ AI processing reliability:
 GitHub collection reliability:
 - GitHub API 403/429 rate-limit responses use exponential backoff retry
 - Secondary rate limit (403) is treated as retryable when response message indicates rate limiting
+- Retry warnings include a `[gh-rate]` snapshot (`resource`, `remaining/limit`, `used`, `reset_at`, `retry_after`) for faster diagnosis
 - Collected items are normalized with stable sort to keep output order deterministic
 
 Runtime note:
@@ -210,6 +214,7 @@ Edit `lib/sources.yml`:
 - **rss_feeds**: `url`, `name`
 - **rubygems**: gem names
 - **github_advisories**: `ecosystem`, `packages`
+- **github_repo_advisories**: list of `{ owner, repo, name }` for repository-level security advisories (use for projects not well-covered by ecosystem advisories)
 
 ## License
 

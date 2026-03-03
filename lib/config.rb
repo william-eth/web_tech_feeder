@@ -12,7 +12,7 @@ module WebTechFeeder
     TPE_UTC_OFFSET = "+08:00"
 
     attr_reader :sources, :logger
-    attr_accessor :run_id
+    attr_accessor :run_id, :project_version
 
     def initialize
       @sources = YAML.safe_load_file(SOURCES_PATH, symbolize_names: true)
@@ -93,6 +93,16 @@ module WebTechFeeder
     # and save the HTML output to tmp/digest_preview.html instead
     def dry_run?
       ENV.fetch("DRY_RUN", "false").downcase == "true"
+    end
+
+    # When true, skip collection and load raw_data from tmp/collected_raw_data.json
+    # (saved by a previous DRY_RUN run). Use for quick prompt/template iteration.
+    def dry_run_from_cache?
+      ENV.fetch("DRY_RUN_FROM_CACHE", "false").downcase == "true"
+    end
+
+    def collection_cache_path
+      ENV.fetch("COLLECTION_CACHE_PATH", File.expand_path("../tmp/collected_raw_data.json", __dir__))
     end
 
     # Number of days to look back for new content

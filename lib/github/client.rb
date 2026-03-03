@@ -144,6 +144,16 @@ module WebTechFeeder
           headers = response[:headers] || {}
           raise unless rate_limited?(status, body)
 
+          remaining = header_int(headers, "x-ratelimit-remaining")
+          limit = header_int(headers, "x-ratelimit-limit")
+          if remaining == 0 && limit && limit.positive?
+            rate_snapshot = rate_limit_snapshot(headers)
+            @logger&.warn(
+              "#{cid_tag}GitHub rate limit exhausted remaining=0/#{limit} — skipping retry, failing fast. #{rate_snapshot}"
+            )
+            raise
+          end
+
           retries += 1
           raise if retries > RATE_LIMIT_MAX_RETRIES
 

@@ -57,7 +57,8 @@ bundle exec ruby bin/generate_digest
 - `MAX_REPO_THREADS=3`: Repo-level workers in GitHub collectors (defaults to 2 without token)
 - `VERBOSE_CID_LOGS=true`: Print run correlation id on verbose collector/client logs
 - `VERBOSE_THREAD_LOGS=true`: Print thread id on verbose collector/client logs for parallel debugging
-- `DRY_RUN=true`: Render preview only, no email delivery
+- `DRY_RUN=true`: Render preview only, no email delivery; also saves collection to `tmp/collected_raw_data.json`
+- `DRY_RUN_FROM_CACHE=true`: Skip collection, load from cache, run AI + render (for quick prompt/template iteration)
 - `RUBY_YJIT_ENABLE=1`: Enable YJIT locally (Ruby 3.1+) for better runtime performance
 
 ### AI Retry Behavior
@@ -69,11 +70,13 @@ bundle exec ruby bin/generate_digest
 ## Adding Data Sources
 
 1. Edit `lib/sources.yml`
-2. Add entries for: `github_releases`, `github_issues`, `rss_feeds`, `rubygems`, `github_advisories`
+2. Add entries for: `github_releases`, `github_issues`, `rss_feeds`, `rubygems`, `github_advisories`, `github_repo_advisories`
 3. For `github_advisories`, specify `ecosystem` (npm, rubygems, go) and `packages` array
-4. For `github_releases`, optional per-repo controls:
+4. For `github_repo_advisories`, add `{ owner, repo, name }` entries for repository-level advisories (use when ecosystem advisories are incomplete)
+5. For `github_releases`, optional per-repo controls:
    - `release_strategy`: `auto` (releases -> tags fallback), `releases_only`, `tags_only`
    - `release_notes_files`: extra changelog-like files to enrich sparse release/tag notes
+   - `release_notes_domains`: domain allowlist for external release-note/announcement links discovered in release bodies
 
 ## Modifying Digest Output
 

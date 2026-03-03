@@ -8,69 +8,98 @@ LANGUAGE:
 
 ## SUMMARY FORMAT
 
-Each item's `summary` field MUST contain exactly 3 blocks separated by newlines:
+Each item's `summary` field MUST contain exactly 3 top-level blocks separated by newlines.
+Do NOT add extra top-level blocks beyond 📌 / 🔍 / 📊.
+Within each block: ALWAYS use bullet points (`•`) for every sentence/point to ensure easy scanning. Do NOT write long continuous paragraphs.
 
-BLOCK 1 — 📌 核心重點 (2-4 sentences):
+READABILITY RULES:
+- Keep bullet points under ~25 words; one idea per bullet.
+- ALWAYS start every point with a bullet (`•`).
+- Avoid jargon stacking; if a term is needed, briefly clarify once.
+- Lead with the key point, then supporting detail.
+- Write for everyday developers. Prefer plain wording over abstract labels.
+- Do NOT invent framework terms such as "意識與止血模式", "戰情模式", or similar jargon.
+- Do NOT repeat block heading text inside content (avoid "核心重點：核心重點...", "技術細節：技術細節...").
+- Do NOT write "見 source_url" or mention "source_url" literally. The title is already a clickable link.
+
+BLOCK 1 — 📌 核心重點 (2-4 bullet points):
   WHAT changed / WHAT is the issue. Include version numbers, affected scope, key takeaway.
 
-BLOCK 2 — 🔍 技術細節 (3-5 sentences):
+BLOCK 2 — 🔍 技術細節 (3-5 bullet points):
   MUST state: (a) exact problem/change, (b) trigger scenario, (c) concrete impact or incompatibility.
   MUST name specific API/method/config, version range, migration path, edge cases.
   MUST NOT use vague phrases:
-    ❌ "修正可能影響使用者登入的問題" → what problem?
-    ❌ "改善與其他 Rails 元件的相容性" → which components? what scenario?
-  ✅ "修正 Devise/Warden 在 OmniAuth callback 後 session 未正確寫入；觸發情境：透過 Google OAuth 登入後 redirect 回應用時 session 為空。原因：Rails 7.1 `config.session_store` 預設值變更，`:cookie_store` 搭配不完整 domain 設定時觸發。"
+    ❌ "修正可能影響使用者登入的問題"
+    ❌ "改善與其他元件的相容性"
+  ✅ "修正 Devise 在 OmniAuth callback 後 session 未正確寫入；觸發情境：透過 Google OAuth 登入後 redirect 回應用時 session 為空。"
 
-BLOCK 3 — 📊 建議動作 (3-6 sentences):
+BLOCK 3 — 📊 建議動作 (3-6 bullet points):
   MUST include ALL applicable: (a) syntax/config changes to apply, (b) deprecated patterns to replace, (c) things to watch for in daily dev.
   MUST NOT be only "upgrade to vX.Y.Z".
-  Use one of these modes:
-    - Action mode (change needed now): include at least one concrete action (command OR code/config patch), plus one validation step (test/check/log).
-    - Awareness mode (no immediate change needed): do NOT force commands; instead include impact check scope, trigger condition for action, and what to monitor next.
-  When code changes apply, include one minimal copy-paste snippet for migration (config/code patch).
-  When using code fences, prefer explicit language tags for simple highlighting (`ruby`, `ts`, `js`, `shell`, `yaml`).
-  When code changes apply, wrap in ``` on its own line (4-12 lines preferred).
-  Code fences belong to BLOCK 3 content and do NOT count as an extra block.
+  Use direct verbs developers can execute: "升級", "檢查", "驗證", "觀察", "回滾". Avoid abstract slogans or awkward prefixes like "現在要做", "若你維護".
+  For breaking changes/issues: include concrete action (command OR code/config patch) + validation step.
+  For pre-release versions (alpha, rc, beta): do NOT recommend adoption. Focus on impact check scope + what to monitor next.
+  Code snippets: only when actionable (config change, migration command). Never `curl`/`wget` changelog fetches. Prefer explicit fence tags (`ruby`, `ts`, `js`, `shell`, `yaml`). Code fences belong to BLOCK 3 and do NOT count as extra blocks.
 
 ## CONTENT-TYPE RULES
 
 | item_type | 📌 focus | 🔍 focus | 📊 focus |
 |-----------|----------|----------|----------|
-| release | Version + 2-3 breaking/notable changes | Exact problem, trigger scenario, compatibility detail | Syntax migration + deprecated replacement + code |
+| release (stable) | Version + 2-3 breaking/notable changes | Exact problem, trigger scenario, compatibility detail | Syntax migration + deprecated replacement + code |
+| release (alpha/rc/beta) | Version + key change areas | Scope of unstable features, what may break | Validation scope, what to monitor, no adoption |
 | advisory | CVE/vulnerability scope | Attack vector, affected versions, exploit condition | Upgrade command + mitigation |
 | issue | Problem/proposal raised | Debate points, conclusion | Actionable takeaway for developers |
 | other | Key insight from blog/article | Technical depth, applicability | Practical next steps |
 
 ## EXAMPLES
 
-Example 1 (release + code):
-📌 核心重點：Rails 7.2.1 發布。開發者須留意：(1) `find_each` 可能跳過記錄；(2) `deliver_later` 預設佇列名稱變更；(3) `deprecation_warning` 輸出格式調整。
-🔍 技術細節：`find_each` 問題發生於使用 `limit` 配合 `order` 時，batch 邊界計算遺漏或重複記錄。Mailer 佇列由 `mailers` 改為 `default`，與 Sidekiq/Resque queue 設定不相容，未指定 queue 名稱會送錯佇列。
-📊 建議動作：升級後執行整合測試。將 `Model.limit(n).find_each` 改為明確 order。檢查 Sidekiq queue 設定：
-```
+Example 1 (stable release + code):
+📌 核心重點
+• Rails 7.2.1 發布。
+• 開發者須留意：(1) `find_each` 可能跳過記錄；(2) `deliver_later` 預設佇列名稱變更。
+🔍 技術細節
+• `find_each` 問題發生於使用 `limit` 配合 `order` 時，batch 邊界計算遺漏或重複記錄。
+• Mailer 佇列由 `mailers` 改為 `default`，與 Sidekiq queue 設定不相容。
+📊 建議動作
+• 升級後執行整合測試。
+• 將 `Model.limit(n).find_each` 改為明確 order。
+• 檢查 Sidekiq queue 設定：
+```ruby
 config.active_job.queue_name = 'mailers'
 ```
 
-Example 2 (security):
-📌 核心重點：Faraday v2.14.1 修補 SSRF 漏洞，攻擊者可誘使伺服器向內部 URL 發送請求。
-🔍 技術細節：URL 驗證僅檢查 redirect 目標 scheme/host，未驗證 `Host` header 與實際連接目標一致。攻擊者可使伺服器向 127.0.0.1 或 metadata endpoint 發送敏感資料。影響所有使用 Faraday 發外部請求的應用。
-📊 建議動作：立即升級至 v2.14.1。若使用 Bundler：
-```
-bundle update faraday
-```
+Example 2 (alpha/rc release — awareness only):
+📌 核心重點
+• Kubernetes v1.36.0-alpha.2 為 alpha 預覽版。
+• SRE 可評估升級風險，但不建議上 production。
+🔍 技術細節
+• alpha 版本常含未定案 feature gates、API 變更。
+• 觸發情境：在測試 cluster 啟用新 feature gate 或使用新 kubelet binary。
+• 影響範圍含 Admission、Scheduler 行為。
+📊 建議動作
+• 在測試環境跑既有流程，確認 API 是否受影響。
+• 把差異整理成清單（會壞什麼、怎麼rollback）。
+• 詳見官方 CHANGELOG。
 
-Example 3 (issue/PR):
-📌 核心重點：Rails 社群討論是否將 `before_action` 回傳值納入 halt 行為。提案者主張 callback 回傳 false 時應中斷 chain。
-🔍 技術細節：爭執點：(1) 隱式 halt 造成除錯困難；(2) 與 `throw :abort` 語意重疊。maintainer 傾向保留 explicit `throw :abort`。
-📊 建議動作：持續關注後續 PR。目前仍應使用 `throw :abort` 明確中斷 callback chain。
+Example 3 (issue with bullets):
+📌 核心重點
+• pg 在連線重試時可能發生 segmentation fault。
+• 屬於原生 extension 崩潰，會直接終結 Ruby process。
+🔍 技術細節
+• 崩潰 stack 多出現在 `database_statements.rb`。
+• 常見觸發：DB 斷線、pool 內無效連線重連失敗。
+• 尚未確認 root cause；目前聚焦縮小觸發條件。
+📊 建議動作
+• 啟用 core dump 以保留 backtrace。
+• 記錄 pg/libpq/Ruby 版本與連線參數。
+• 調整 connection pool 策略，減少 reaper 觸發重連。
 
 ## ITEM SELECTION
 
-1. Up to 7 items per category. Balance: releases + advisories + at least 1-2 substantive Issue/PR/Blog items.
-2. Include 1-2 items from GitHub Issues/PRs or RSS/Blog when substantive candidates exist in raw data. Mark notable ones as "high".
-3. DEDUPLICATE: same vulnerability/release from multiple sources → ONE merged entry.
-4. ONE RELEASE PER PROJECT: multiple versions of same project → output only the latest.
-5. Skip only trivial, off-topic, or redundant content.
+1. Up to 7 items per category. Balance: releases + advisories + at least 1-2 substantive Issue/PR/Blog items when available. Mark notable items as "high".
+2. DEDUPLICATE: same vulnerability/release from multiple sources → ONE merged entry.
+3. ONE RELEASE PER PROJECT: multiple versions of same project → output only the latest.
+4. Skip trivial, off-topic, or redundant content.
 
 ## SECTION PERSPECTIVE (ROLE-BASED WRITING)
 
@@ -92,6 +121,7 @@ Ruby-centric section. Go content: include ONLY major items (major version, break
 ## ACCURACY
 - Each item's title MUST match its source. Do NOT mix packages.
 - Preserve `source_url` and `source_name` from raw data exactly.
+- For JSON output, both stable and pre-release entries use `item_type: "release"`.
 
 ## RAW DATA
 <%= raw_data %>
