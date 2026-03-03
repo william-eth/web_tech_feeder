@@ -206,9 +206,10 @@ Runtime note:
 
 Edit `lib/sources.yml`:
 
-- **github_releases**: `owner`, `repo`, `name` (optional: `release_strategy`, `release_notes_files`)
+- **github_releases**: `owner`, `repo`, `name` (optional: `release_strategy`, `release_notes_files`, `release_notes_path_template`, `release_notes_domains`)
   - `release_strategy`: `auto` (default), `releases_only`, `tags_only`
   - `release_notes_files`: optional list of changelog-like files (e.g. `Changes.md`, `CHANGELOG.md`) used to enrich sparse release/tag notes
+  - `release_notes_path_template`: optional path template with `%{major}` and `%{minor}` placeholders (e.g. `CHANGELOG/CHANGELOG-%{major}.%{minor}.md` for Kubernetes); resolved from tag (e.g. `v1.36.0-alpha.2` → `1.36`), tried before `release_notes_files`
   - `release_notes_domains`: optional domain allowlist for external announcement/release-note links found in release body
 - **github_issues**: `owner`, `repo`, `name`
 - **rss_feeds**: `url`, `name`

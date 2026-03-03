@@ -76,6 +76,7 @@ bundle exec ruby bin/generate_digest
 5. For `github_releases`, optional per-repo controls:
    - `release_strategy`: `auto` (releases -> tags fallback), `releases_only`, `tags_only`
    - `release_notes_files`: extra changelog-like files to enrich sparse release/tag notes
+   - `release_notes_path_template`: path template with `%{major}`, `%{minor}` (e.g. `CHANGELOG/CHANGELOG-%{major}.%{minor}.md` for Kubernetes); derived from tag, tried before `release_notes_files`
    - `release_notes_domains`: domain allowlist for external release-note/announcement links discovered in release bodies
 
 ## Modifying Digest Output

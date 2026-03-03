@@ -204,6 +204,19 @@ module WebTechFeeder
       end
 
       def fetch_release_notes_excerpt(owner:, repo:, current_tag:, previous_tag:, repo_config:)
+        # Try template-based path first (e.g. CHANGELOG/CHANGELOG-1.36.md for K8s)
+        template_path = resolve_release_notes_template(repo_config, current_tag)
+        if template_path
+          content = fetch_repo_text_file(owner, repo, template_path)
+          unless content.to_s.strip.empty?
+            section = extract_version_section(content, current_tag, previous_tag)
+            unless section.to_s.strip.empty?
+              logger.info("#{cid_tag}#{styled_tag('release-context')} #{owner}/#{repo} release notes matched from #{template_path}")
+              return "Changelog (#{template_path}):\n#{truncate_body(section, max_length: 2500)}"
+            end
+          end
+        end
+
         files = release_notes_files(repo_config)
         files.each do |file_path|
           content = fetch_repo_text_file(owner, repo, file_path)
@@ -331,6 +344,31 @@ module WebTechFeeder
         return DEFAULT_RELEASE_NOTES_FILES unless files.is_a?(Array) && files.any?
 
         files.map(&:to_s)
+      end
+
+      # Resolves release_notes_path_template using tag version.
+      # Template placeholders: %{major}, %{minor} (e.g. v1.36.0-alpha.2 -> CHANGELOG/CHANGELOG-1.36.md)
+      def resolve_release_notes_template(repo_config, current_tag)
+        template = repo_config[:release_notes_path_template].to_s.strip
+        return nil if template.empty?
+
+        major, minor = parse_major_minor(current_tag)
+        return nil if major.nil? || minor.nil?
+
+        path = template.gsub("%{major}", major.to_s).gsub("%{minor}", minor.to_s)
+        path.empty? ? nil : path
+      end
+
+      def parse_major_minor(tag)
+        return [nil, nil] if tag.to_s.strip.empty?
+
+        cleaned = tag.to_s.strip.sub(/\Av/i, "")
+        parts = cleaned.split(".")
+        return [nil, nil] if parts.empty?
+
+        major = parts[0].to_s.match?(/\A\d+\z/) ? parts[0] : nil
+        minor = parts[1].to_s.match?(/\A\d+\z/) ? parts[1] : nil
+        [major, minor]
       end
 
       def release_strategy(repo_config)

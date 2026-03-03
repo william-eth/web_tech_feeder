@@ -238,6 +238,7 @@ devops:
     - owner: kubernetes
       repo: kubernetes
       name: Kubernetes
+      release_notes_path_template: "CHANGELOG/CHANGELOG-%{major}.%{minor}.md"
     - owner: hashicorp
       repo: terraform
       name: Terraform

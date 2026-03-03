@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Inline code IDE font stack**: `SF Mono`, `Menlo`, `Consolas` for better readability.
 - **List bullet normalization**: Markdown `-` / `*` converted to `•` in summary content.
 - **GitHub Issue linkification**: `#12345` and `(#12345)` in summary content become clickable links when `source_url` is a GitHub repo.
+- **release_notes_path_template**: Dynamic changelog path for `github_releases` (e.g. `CHANGELOG/CHANGELOG-%{major}.%{minor}.md`); Kubernetes now enriches releases from per-minor changelog files.
 
 ### Changed
 - **Summary section styling**: Stronger label styling (bold, border-bottom) to separate 核心重點/技術細節/建議動作 from body text.
@@ -34,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 - **sources.yml**: Inline comments for `github_repo_advisories` (when to use, keep list small).
-- **README / CONTRIBUTING / PLAN**: Documented `github_repo_advisories`, `DRY_RUN_FROM_CACHE`, updated Security source descriptions, and DevOps two-layer advisory strategy.
+- **README / CONTRIBUTING / PLAN**: Documented `github_repo_advisories`, `DRY_RUN_FROM_CACHE`, `release_notes_path_template`, updated Security source descriptions, and DevOps two-layer advisory strategy.
 
 ## [1.0.1] - 2026-03-02
 
