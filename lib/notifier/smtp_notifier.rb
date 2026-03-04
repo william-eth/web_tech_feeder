@@ -258,10 +258,27 @@ module WebTechFeeder
         # Preserve paragraph breaks so blocks render with visual separation
         escaped = escaped.gsub(/\r\n?/, "\n").gsub(/\n{2,}/, "<br>").gsub(/\n/, "<br>")
 
+        # Preserve leading indentation for nested bullet lines.
+        # HTML collapses normal spaces, so convert line-start spaces to &nbsp;.
+        escaped = escaped.gsub(/(^|<br>)( +)(•\s)/) do
+          "#{Regexp.last_match(1)}#{'&nbsp;' * Regexp.last_match(2).length}#{Regexp.last_match(3)}"
+        end
+
         # Convert Markdown list items (- or *) to bullet points (•)
         escaped = escaped.gsub(/(?:^|<br>)\s*(?:-|\*)\s+/) { |m| m.sub(/[-*]/, '•') }
 
         escaped = linkify_github_refs(escaped, github_repo_url) if github_repo_url.to_s.strip != ""
+
+        # Emphasize grouped labels in technical details to improve scanability.
+        # Run this after GitHub ref linkification so style strings are never parsed as #123 refs.
+        escaped = escaped.gsub(/(^|<br>)(?:\s*•\s*)?(變更點：|⚠\s*影響：)/) do
+          "#{Regexp.last_match(1)}<span class=\"summary-group-label\" style=\"#{summary_group_label_style}\">#{Regexp.last_match(2)}</span>"
+        end
+        escaped = escaped.gsub(
+          %r{(<span class="summary-group-label"[^>]*>[^<]+</span>)(?:<br>(?:&nbsp;|\s)*)+},
+          '\1'
+        )
+
         with_inline = escaped.gsub(/`([^`\n]+)`/) do
           "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{Regexp.last_match(1)}</code>"
         end
@@ -372,6 +389,10 @@ module WebTechFeeder
 
       def summary_part_body_style
         "word-break:break-word;overflow-wrap:anywhere;white-space:normal;line-height:1.5;color:#334155;mso-line-height-rule:exactly;"
+      end
+
+      def summary_group_label_style
+        "display:block;font-weight:700;color:#1e293b;margin:0;line-height:1.25;"
       end
 
       def item_source_style

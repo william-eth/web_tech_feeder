@@ -10,6 +10,11 @@ Readability rules: short sentences (~25 words), one idea per sentence; avoid jar
 
 1. **📌 Core point** (2–4 sentences): What changed, the issue, release overview, impact scope
 2. **🔍 Technical details** (3–5 sentences when relevant): Exact change/problem, trigger scenario, concrete compatibility impact; omit if trivial
+   - Group by meaning, not alternating narration:
+     - Label line: `變更點：` + 2–3 indented child bullets (`  • A`, `  • B`)
+     - Label line: `⚠ 影響：` + 1–2 indented child bullets (`  • C`, `  • D`)
+   - Keep all change children contiguous, then all impact children contiguous
+   - Avoid bracket labels like `[變更點]` / `[影響]`
 3. **📊 Recommended actions** (3–6 sentences): Actionability depends on mode:
    - **Action mode** (change needed now): include at least one concrete action (command or code/config patch) and one validation step
    - **Awareness mode** (no immediate change needed): do not force commands; include impact check scope, trigger condition for action, and what to monitor next

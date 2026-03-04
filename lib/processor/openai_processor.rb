@@ -8,42 +8,42 @@ module WebTechFeeder
   module Processor
     # OpenAI-compatible API provider.
     # Works with: OpenRouter, Groq, Together AI, local Ollama, OpenAI, etc.
+    # All providers use the /chat/completions endpoint.
     #
     # Configuration via environment variables:
     #   AI_API_URL   - Base URL (e.g. "https://openrouter.ai/api/v1")
     #   AI_API_KEY   - API key (optional for some providers like Ollama)
-    #   AI_MODEL     - Model name (e.g. "openrouter/free")
+    #   AI_MODEL     - Model name (e.g. "gpt-4.1-mini")
+    # Non-retryable API error (e.g. 401/403/404).
+    # Raised to bypass category-level retry in BaseProcessor.
+    class FatalApiError < RuntimeError; end
+
     class OpenaiProcessor < BaseProcessor
       RETRYABLE_HTTP_STATUSES = [429, 500, 502, 503, 504].freeze
+      FATAL_HTTP_STATUSES = [401, 403, 404].freeze
       MAX_HTTP_STATUS_RETRIES = 2
 
       def provider_name
         "OpenAI-compatible (#{config.ai_model} @ #{config.ai_api_url})"
       end
 
-      # Sends prompt via OpenAI-compatible API and returns response text.
-      # Primary path: /chat/completions. If model is completion-only,
-      # fallback to /completions automatically.
       def call_api(prompt)
         conn = build_connection
-        mode = :chat
 
         headers = { "Content-Type" => "application/json" }
         headers["Authorization"] = "Bearer #{config.ai_api_key}" if config.ai_api_key && !config.ai_api_key.empty?
         headers["HTTP-Referer"] = "https://github.com/web-tech-feeder" if config.ai_api_url.include?("openrouter")
         headers["X-Title"] = "Web Tech Feeder" if config.ai_api_url.include?("openrouter")
 
-        response = post_chat_completion(conn, prompt, headers)
-        if chat_endpoint_not_supported?(response)
-          logger.warn("Model #{config.ai_model} is not chat-compatible on this provider; fallback to /completions")
-          response = post_text_completion(conn, prompt, headers)
-          mode = :completion
-        end
+        endpoint = build_chat_endpoint
+        body = build_chat_request_body(prompt)
+        response = post_with_status_retry(conn, endpoint, body, headers)
 
-        # Manual status check with detailed error reporting
         unless response.status == 200
-          error_body = response.body.to_s[0..500]
-          raise "API returned status #{response.status}: #{error_body}"
+          message = extract_error_message(response.body)
+          detail = message.empty? ? response.body.to_s[0..500] : message
+          error_class = FATAL_HTTP_STATUSES.include?(response.status) ? FatalApiError : RuntimeError
+          raise error_class, "API returned status #{response.status}: #{detail}"
         end
 
         parsed = JSON.parse(response.body)
@@ -53,10 +53,9 @@ module WebTechFeeder
         end
 
         choice = parsed.dig("choices", 0)
-        text = extract_response_text(choice, mode)
+        text = choice&.dig("message", "content")
 
         if text.nil? || text.strip.empty?
-          # Debug: log raw response structure to diagnose empty content
           finish_reason = choice&.dig("finish_reason")
           usage = parsed["usage"]
           logger.warn("Empty API response. finish_reason=#{finish_reason.inspect}, usage=#{usage.inspect}")
@@ -83,6 +82,7 @@ module WebTechFeeder
       # Set AI_USE_MAX_COMPLETION_TOKENS=true to force max_completion_tokens for any model.
       def uses_max_completion_tokens?
         return true if ENV["AI_USE_MAX_COMPLETION_TOKENS"]&.downcase == "true"
+
         model = config.ai_model.to_s.downcase
         model.match?(/gpt-5|o1-|o3-/)
       end
@@ -104,36 +104,9 @@ module WebTechFeeder
         base
       end
 
-      def build_completion_request_body(prompt)
-        {
-          model: config.ai_model,
-          prompt: "#{system_prompt}\n\nUSER TASK:\n#{prompt}\n\nReturn ONLY valid JSON.",
-          temperature: 0.2,
-          max_tokens: [config.ai_max_tokens, 8192].min
-        }
-      end
-
       def build_chat_endpoint
-        # Ensure correct URL construction regardless of trailing slash in base URL
         base = config.ai_api_url.chomp("/")
         "#{base}/chat/completions"
-      end
-
-      def build_completion_endpoint
-        base = config.ai_api_url.chomp("/")
-        "#{base}/completions"
-      end
-
-      def post_chat_completion(conn, prompt, headers)
-        endpoint = build_chat_endpoint
-        body = build_chat_request_body(prompt)
-        post_with_status_retry(conn, endpoint, body, headers)
-      end
-
-      def post_text_completion(conn, prompt, headers)
-        endpoint = build_completion_endpoint
-        body = build_completion_request_body(prompt)
-        post_with_status_retry(conn, endpoint, body, headers)
       end
 
       def post_with_status_retry(conn, endpoint, body, headers)
@@ -141,6 +114,8 @@ module WebTechFeeder
         loop do
           logger.debug("POST #{endpoint}")
           response = conn.post(endpoint, body.to_json, headers)
+          return response if response.status == 200
+          return response if FATAL_HTTP_STATUSES.include?(response.status)
           return response unless RETRYABLE_HTTP_STATUSES.include?(response.status)
           return response if attempt >= MAX_HTTP_STATUS_RETRIES
 
@@ -159,18 +134,6 @@ module WebTechFeeder
         end
       end
 
-      def chat_endpoint_not_supported?(response)
-        return false unless [400, 404].include?(response.status)
-
-        message = extract_error_message(response.body)
-        return false if message.empty?
-
-        lowered = message.downcase
-        lowered.include?("not a chat model") ||
-          lowered.include?("not supported in the v1/chat/completions endpoint") ||
-          lowered.include?("did you mean to use v1/completions")
-      end
-
       def extract_error_message(body)
         parsed = JSON.parse(body.to_s)
         parsed.dig("error", "message").to_s
@@ -178,16 +141,7 @@ module WebTechFeeder
         ""
       end
 
-      def extract_response_text(choice, mode)
-        if mode == :completion
-          return choice&.dig("text")
-        end
-
-        choice&.dig("message", "content")
-      end
-
       def build_connection
-        # Do NOT use raise_error middleware - we handle errors manually for better logging
         Faraday.new do |f|
           f.request :retry, max: 2, interval: 2, backoff_factor: 2,
                             exceptions: [Faraday::TimeoutError, Faraday::ConnectionFailed]

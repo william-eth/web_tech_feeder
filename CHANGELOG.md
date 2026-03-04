@@ -14,8 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Valkey server source**: Added Valkey (server) to DevOps `github_releases` and `github_repo_advisories`.
 - **DRY_RUN_FROM_CACHE**: Skip collection and load from `tmp/collected_raw_data.json` for fast prompt/template iteration without re-fetching.
 - **Project version in email footer**: `PROJECT_VERSION` env (e.g. from CI tag) and AI-generated disclaimer line in digest footer.
-- **OpenAI processor chat/completions fallback**: Automatically fallback to `/completions` when model is not chat-compatible (e.g. `gpt-5.3-codex`).
 - **OpenAI processor 429/5xx retry**: Short backoff retries for transient `429`, `500`, `502`, `503`, `504` and network errors before propagating failure.
+- **Fatal API error early-abort**: `401`/`403`/`404` responses (`FatalApiError`) immediately stop AI processing for all remaining categories and fall back, avoiding wasted retries on permanent errors such as invalid credentials or non-existent models.
 - **Code block syntax highlighting**: Lightweight tokenizer for Ruby/TS/JS/Shell/YAML with identifier handling (fixes `stdin` mis-colored as keyword).
 - **Inline code IDE font stack**: `SF Mono`, `Menlo`, `Consolas` for better readability.
 - **List bullet normalization**: Markdown `-` / `*` converted to `•` in summary content.
@@ -27,11 +27,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DevOps Go advisories**: Extended packages to include OpenTofu, Docker Engine, Helm, Grafana, ArgoCD.
 - **Prompt readability**: Enforce bullet lists, block-specific depth, avoid "見 source_url" and awkward prefixes like "現在要做"/"若你維護".
 - **Prompt examples**: Rewritten to bullet-only format; alpha/rc releases use awareness-only guidance.
-- **Completion mode token cap**: `max_tokens` capped at 8192 for `/completions` path to reduce 5xx risk.
+- **Prompt technical-detail grouping**: `🔍 技術細節` now enforces grouped output (first `變更點`, then `⚠ 影響`) with child bullets, replacing alternating change/impact narration and bracket-style labels.
+- **Email rendering for grouped bullets**: Preserves nested indentation (`  •` via `&nbsp;`) and emphasizes group labels (`變更點：`, `⚠ 影響：`) with bold styling; tightened vertical spacing between labels and child bullets; collapsed extra blank lines after group labels.
+- **API error reporting**: Error messages now extracted from JSON response body (`error.message`) instead of truncated raw text, providing full diagnostic detail on failure.
 
 ### Fixed
 - **HTML entity breakage in linkify**: Excluded `&#39;` (apostrophe) from GitHub ref regex so `require('yargs')` no longer becomes `require(&<a>#39</a>;)`.
 - **Truncation mid-issue-ref**: `truncate_text` no longer cuts `(#12345)` or `#12345` in the middle.
+- **Grouped-label rendering corruption**: Reordered linkification and style-injection passes so GitHub `#123` regex no longer corrupts inline CSS color codes in `變更點/影響` labels.
+
+### Removed
+- **Legacy `/completions` fallback**: Removed unused text-completions endpoint fallback from OpenAI processor. All modern providers use `/chat/completions` exclusively; the dead path only caused confusing retry noise on unsupported models.
 
 ### Documentation
 - **sources.yml**: Inline comments for `github_repo_advisories` (when to use, keep list small).
@@ -176,7 +182,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...HEAD
+[1.1.0]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...1.0.0
 [0.1.5]: https://github.com/william-eth/web_tech_feeder/compare/0.1.4...0.1.5
