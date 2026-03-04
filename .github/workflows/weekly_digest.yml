@@ -27,6 +27,7 @@ jobs:
 
       - name: Generate and send weekly digest
         env:
+          PROJECT_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
           CI: true
           # Use GH_PAT_TOKEN for higher rate limits; falls back to default GITHUB_TOKEN if not set
           GITHUB_TOKEN: ${{ secrets.GH_PAT_TOKEN || github.token }}

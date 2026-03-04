@@ -4,11 +4,30 @@ Reference for contributors modifying `lib/prompts/category_digest.erb`.
 
 ## Summary Structure
 
-Each item must have three blocks, separated by line breaks:
+Each item must have three blocks, separated by line breaks. Within each block, use **double newline (blank line)** to separate paragraphs. Use bullet points (• or -) when listing 3+ items.
+
+Readability rules: short sentences (~25 words), one idea per sentence; avoid jargon stacking; lead with the key point.
 
 1. **📌 Core point** (2–4 sentences): What changed, the issue, release overview, impact scope
-2. **🔍 Technical details** (2–4 sentences when relevant): How it works, breaking changes, migration impact; omit if trivial
-3. **📊 Recommended actions** (2–3 sentences): Concrete next steps, version targets, testing tips
+2. **🔍 Technical details** (3–5 sentences when relevant): Exact change/problem, trigger scenario, concrete compatibility impact; omit if trivial
+   - Group by meaning, not alternating narration:
+     - Label line: `變更點：` + 2–3 indented child bullets (`  • A`, `  • B`)
+     - Label line: `⚠ 影響：` + 1–2 indented child bullets (`  • C`, `  • D`)
+   - Keep all change children contiguous, then all impact children contiguous
+   - Avoid bracket labels like `[變更點]` / `[影響]`
+3. **📊 Recommended actions** (3–6 sentences): Actionability depends on mode:
+   - **Action mode** (change needed now): include at least one concrete action (command or code/config patch) and one validation step
+   - **Awareness mode** (no immediate change needed): do not force commands; include impact check scope, trigger condition for action, and what to monitor next
+
+When code patches are needed, include a minimal copy-paste snippet and prefer explicit fence language tags (`ruby`, `ts`, `js`, `shell`, `yaml`).
+
+### Non-Official Releases (alpha, rc, beta)
+
+Use Awareness mode only. Do not recommend adoption, production deployment, or upgrade. Focus on what changed and what to monitor. Never suggest "upgrade to vX.Y.Z-alpha".
+
+### Code Snippet Rules
+
+Include code blocks only when actionable (config, migration command, `bundle update`, etc.). Do not include `curl`/`wget` commands that fetch changelog; people read changelogs in the browser. Prefer direct links to the web changelog.
 
 ## Content-Type Requirements
 

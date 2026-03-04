@@ -44,6 +44,7 @@ module WebTechFeeder
         jobs << rss_feeds_job(category, source_config[:rss_feeds]) if source_config[:rss_feeds]&.any?
         jobs << rubygems_job(source_config[:rubygems]) if source_config[:rubygems]&.any?
         jobs << github_advisories_job(source_config[:github_advisories]) if source_config[:github_advisories]
+        jobs << github_repo_advisories_job(source_config[:github_repo_advisories]) if source_config[:github_repo_advisories]&.any?
         jobs
       end
 
@@ -107,6 +108,20 @@ module WebTechFeeder
               @config,
               ecosystem: adv_config[:ecosystem],
               packages: adv_config[:packages]
+            )
+            collector.collect
+          }
+        }
+      end
+
+      def github_repo_advisories_job(repos)
+        {
+          name: "github_repo_advisories",
+          call: lambda {
+            require_relative "../collectors/github_repo_advisory_collector"
+            collector = Collectors::GithubRepoAdvisoryCollector.new(
+              @config,
+              repos: repos
             )
             collector.collect
           }

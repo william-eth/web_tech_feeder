@@ -33,20 +33,35 @@ module WebTechFeeder
         logger.info("Processing #{total} items across #{raw_data.size} categories via #{provider_name}")
 
         result = {}
+        categories = raw_data.to_a
+        api_dead = false
 
-        raw_data.each_with_index do |(category, items), index|
+        categories.each_with_index do |(category, items), index|
           if items.empty?
             result[category] = { section_title: CATEGORY_TITLES[category], items: [] }
+            next
+          end
+
+          if api_dead
+            logger.warn("Skipping AI for #{category} due to earlier fatal API error, using fallback")
+            result[category] = fallback_category(category, items)
             next
           end
 
           logger.info("Processing category: #{category} (#{items.size} items)")
           result[category] = process_category(category, items)
 
-          if index < raw_data.size - 1
+          if index < categories.size - 1
             logger.info("Waiting #{RATE_LIMIT_DELAY}s before next API call")
             sleep(RATE_LIMIT_DELAY)
           end
+        rescue Processor::FatalApiError => e
+          api_dead = true
+          reason = "#{e.class}: #{e.message}"
+          logger.error("Fatal API error for #{category}, aborting AI for remaining categories. reason=#{reason}")
+          bt = Array(e.backtrace).first(3)&.join(" | ")
+          logger.error("AI processing backtrace for #{category}: #{bt}") if bt && !bt.empty?
+          result[category] = fallback_category(category, items)
         end
 
         result
@@ -71,6 +86,8 @@ module WebTechFeeder
         begin
           text = call_api(prompt)
           parse_response_text(text, category)
+        rescue Processor::FatalApiError
+          raise
         rescue StandardError => e
           retries += 1
           reason = "#{e.class}: #{e.message}"
@@ -87,6 +104,7 @@ module WebTechFeeder
           fallback_category(category, items)
         end
       end
+
 
       PROMPT_TEMPLATE_PATH = File.expand_path("../prompts/category_digest.erb", __dir__)
 

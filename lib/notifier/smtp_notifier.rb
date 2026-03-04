@@ -5,6 +5,7 @@ require "mail"
 require "erb"
 require "google/apis/gmail_v1"
 require "googleauth"
+require "strscan"
 
 module WebTechFeeder
   module Notifier
@@ -102,7 +103,7 @@ module WebTechFeeder
         end_date = Time.now
         start_date = end_date - (config.lookback_days * 24 * 60 * 60)
         week_str = "#{start_date.strftime('%m/%d')}~#{end_date.strftime('%m/%d')}"
-        "[Tech Digest] 每週技術新知摘要 #{week_str}"
+        "【Tech Digest】 每週技術新知摘要 #{week_str}"
       end
     end
 
@@ -113,6 +114,12 @@ module WebTechFeeder
       def initialize(digest_data, config)
         @digest_data = digest_data
         @config = config
+      end
+
+      def project_version
+        v = @config.respond_to?(:project_version) ? @config.project_version : nil
+        s = v.to_s.strip
+        s.empty? || s.downcase == "unknown" ? nil : s
       end
 
       def date_range
@@ -151,19 +158,30 @@ module WebTechFeeder
 
         structured = parts.map do |p|
           if p.start_with?("📌")
-            ["📌 核心重點", p.sub(/\A📌\s*(?:核心重點[：:]\s*)?/, "").strip]
+            ["📌 核心重點", normalize_block_content(p, icon: "📌", heading: "核心重點")]
           elsif p.start_with?("🔍")
-            ["🔍 技術細節", p.sub(/\A🔍\s*(?:技術細節[：:]\s*)?/, "").strip]
+            ["🔍 技術細節", normalize_block_content(p, icon: "🔍", heading: "技術細節")]
           elsif p.start_with?("📊")
-            ["📊 建議動作", p.sub(/\A📊\s*(?:建議動作[：:]\s*)?/, "").strip]
+            ["📊 建議動作", normalize_block_content(p, icon: "📊", heading: "建議動作")]
           end
         end.compact
 
         structured.any? ? structured : [[nil, text]]
       end
 
+      # Remove duplicated heading text from block content, e.g.
+      # "📌 核心重點 核心重點：..." => "..."
+      def normalize_block_content(text, icon:, heading:)
+        content = text.to_s.sub(/\A#{Regexp.escape(icon)}\s*/, "")
+        2.times do
+          content = content.sub(/\A#{Regexp.escape(heading)}(?:\s*[：:])?\s*/i, "")
+        end
+        content.strip
+      end
+
       # Truncate text to max_length, appending "..." if truncated.
-      # Prefers breaking at last space to avoid mid-word cuts (e.g. "strate..." -> "...").
+      # Prefers breaking at last space to avoid mid-word cuts.
+      # Avoids cutting in the middle of GitHub-style issue refs: (#12345), #12345.
       def truncate_text(text, max_length = 200)
         return "" if text.nil?
 
@@ -171,9 +189,20 @@ module WebTechFeeder
         return cleaned if cleaned.length <= max_length
 
         cut = cleaned[0...max_length]
-        last_space = cut.rindex(" ")
-        # If truncation cuts mid-word, break at last space instead
-        cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
+        # If we cut inside (#\d+) or #\d+, extend to include the full ref or trim the partial
+        rest = cleaned[max_length..]
+        if cut =~ /\(#\d*$/
+          if rest && rest.match?(/\A(\d*)\)/)
+            cut = "#{cut}#{Regexp.last_match(1)})"
+          else
+            cut = cut.sub(/\(#\d*$/, "")
+          end
+        elsif cut =~ /#\d*$/ && rest && rest.match?(/\A(\d+)/)
+          cut = "#{cut}#{Regexp.last_match(1)}"
+        else
+          last_space = cut.rindex(" ")
+          cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
+        end
         "#{cut}..."
       end
 
@@ -188,14 +217,36 @@ module WebTechFeeder
         CGI.escapeHTML(str.to_s)
       end
 
+      def github_repo_base_url(url)
+        return nil if url.to_s.strip.empty?
+        base = url.to_s.strip.sub(%r{/releases/.*}, "").sub(%r{/issues/.*}, "").sub(%r{/pull/.*}, "").sub(%r{/tree/.*}, "").sub(%r{/blob/.*}, "").sub(%r{/\z}, "")
+        base.match?(%r{\Ahttps?://github\.com/[^/]+/[^/]+}) ? base : nil
+      end
+
+      def linkify_github_refs(html, repo_url)
+        base = github_repo_base_url(repo_url)
+        return html unless base
+
+        issues_url = "#{base}/issues/"
+        link_style = item_title_link_style
+        # (#12345) first, then standalone #12345 — use placeholders to avoid double-replace
+        html = html.gsub(/\(#(\d+)\)/) { "__PAREN_REF_#{Regexp.last_match(1)}__" }
+        html = html.gsub(/(?<![#"\/\w&;])(#(\d+))(?!\d)/) do
+          "<a href=\"#{issues_url}#{Regexp.last_match(2)}\" style=\"#{link_style}\">##{Regexp.last_match(2)}</a>"
+        end
+        html.gsub(/__PAREN_REF_(\d+)__/) { "(<a href=\"#{issues_url}#{Regexp.last_match(1)}\" style=\"#{link_style}\">##{Regexp.last_match(1)}</a>)" }
+      end
+
       # Format summary content: escape HTML, convert ```...``` to block code, `...` to inline code.
-      # Inline code gets gray background for markdown-like readability.
-      def format_summary_content(text)
+      # Optionally linkify GitHub issue refs (#12345, (#12345)) when github_repo_url is given.
+      def format_summary_content(text, github_repo_url = nil)
         return "" if text.to_s.strip.empty?
 
-        escaped = escape_html(text)
+        # Normalize pre-escaped entities from upstream content (e.g. &#39;)
+        # before escaping again for safe HTML rendering.
+        normalized_text = CGI.unescapeHTML(text.to_s)
         blocks = []
-        with_placeholders = escaped.gsub(/```([a-zA-Z0-9_+\-]*)\s*\n?(.*?)```/m) do
+        with_placeholders = normalized_text.gsub(/```([a-zA-Z0-9_+\-]*)\s*\n?(.*?)```/m) do
           lang = normalize_code_lang(Regexp.last_match(1))
           code = Regexp.last_match(2).to_s.strip.gsub(/\r\n?/, "\n")
           idx = blocks.length
@@ -203,14 +254,39 @@ module WebTechFeeder
           "__CODE_BLOCK_#{idx}__"
         end
 
-        with_inline = with_placeholders.gsub(/`([^`\n]+)`/) do
-          "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{$1}</code>"
+        escaped = escape_html(with_placeholders)
+        # Preserve paragraph breaks so blocks render with visual separation
+        escaped = escaped.gsub(/\r\n?/, "\n").gsub(/\n{2,}/, "<br>").gsub(/\n/, "<br>")
+
+        # Preserve leading indentation for nested bullet lines.
+        # HTML collapses normal spaces, so convert line-start spaces to &nbsp;.
+        escaped = escaped.gsub(/(^|<br>)( +)(•\s)/) do
+          "#{Regexp.last_match(1)}#{'&nbsp;' * Regexp.last_match(2).length}#{Regexp.last_match(3)}"
+        end
+
+        # Convert Markdown list items (- or *) to bullet points (•)
+        escaped = escaped.gsub(/(?:^|<br>)\s*(?:-|\*)\s+/) { |m| m.sub(/[-*]/, '•') }
+
+        escaped = linkify_github_refs(escaped, github_repo_url) if github_repo_url.to_s.strip != ""
+
+        # Emphasize grouped labels in technical details to improve scanability.
+        # Run this after GitHub ref linkification so style strings are never parsed as #123 refs.
+        escaped = escaped.gsub(/(^|<br>)(?:\s*•\s*)?(變更點：|⚠\s*影響：)/) do
+          "#{Regexp.last_match(1)}<span class=\"summary-group-label\" style=\"#{summary_group_label_style}\">#{Regexp.last_match(2)}</span>"
+        end
+        escaped = escaped.gsub(
+          %r{(<span class="summary-group-label"[^>]*>[^<]+</span>)(?:<br>(?:&nbsp;|\s)*)+},
+          '\1'
+        )
+
+        with_inline = escaped.gsub(/`([^`\n]+)`/) do
+          "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{Regexp.last_match(1)}</code>"
         end
 
         with_inline.gsub(/__CODE_BLOCK_(\d+)__/) do
           idx = Regexp.last_match(1).to_i
           lang, code = blocks[idx]
-          "<code class=\"summary-code summary-code-#{lang}\" style=\"#{block_code_style(lang)}\">#{code}</code>"
+          render_code_block(lang, code)
         end
       end
 
@@ -300,19 +376,23 @@ module WebTechFeeder
       end
 
       def item_summary_style
-        "font-size:13px;color:#475569;margin:0 0 8px 0;line-height:1.55;word-break:break-word;overflow-wrap:anywhere;white-space:normal;mso-line-height-rule:exactly;"
+        "font-size:13px;color:#475569;margin:0 0 8px 0;line-height:1.4;word-break:break-word;overflow-wrap:anywhere;white-space:normal;mso-line-height-rule:exactly;"
       end
 
       def summary_part_style
-        "padding:0 0 8px 0;"
+        "padding:0 0 16px 0;"
       end
 
       def summary_part_label_style
-        "font-size:12px;font-weight:600;color:#64748b;margin-bottom:3px;mso-line-height-rule:exactly;"
+        "font-size:13px;font-weight:700;color:#0f172a;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #cbd5e1;display:block;mso-line-height-rule:exactly;"
       end
 
       def summary_part_body_style
-        "word-break:break-word;overflow-wrap:anywhere;white-space:normal;mso-line-height-rule:exactly;"
+        "word-break:break-word;overflow-wrap:anywhere;white-space:normal;line-height:1.5;color:#334155;mso-line-height-rule:exactly;"
+      end
+
+      def summary_group_label_style
+        "display:block;font-weight:700;color:#1e293b;margin:0;line-height:1.25;"
       end
 
       def item_source_style
@@ -349,14 +429,19 @@ module WebTechFeeder
 
       def block_code_style(lang = nil)
         palette = code_style_palette(lang)
-        "display:block;font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:12px;" \
+        "display:block;#{code_font_family}font-size:12px;" \
           "background:#{palette[:bg]};color:#{palette[:fg]};border:1px solid #{palette[:border]};" \
-          "border-radius:6px;padding:10px 12px;margin:8px 0;line-height:1.5;white-space:pre-wrap;" \
+          "border-left:4px solid #{palette[:accent]};border-radius:6px;padding:10px 12px;margin:8px 0;" \
+          "line-height:1.5;white-space:pre-wrap;" \
           "word-break:break-word;overflow-wrap:anywhere;"
       end
 
+      def code_font_family
+        "font-family:ui-monospace,SFMono-Regular,'SF Mono',Menlo,Consolas,'Liberation Mono',monospace;"
+      end
+
       def inline_code_style
-        "font-family:ui-monospace,'SF Mono','Fira Code',monospace;font-size:0.9em;background:#e2e8f0;color:#334155;padding:2px 6px;border-radius:3px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;"
+        "#{code_font_family}font-size:0.9em;background:#e2e8f0;color:#334155;padding:2px 6px;border-radius:3px;white-space:normal;word-break:break-word;overflow-wrap:anywhere;"
       end
 
       def normalize_code_lang(lang)
@@ -374,15 +459,121 @@ module WebTechFeeder
       def code_style_palette(lang)
         case normalize_code_lang(lang)
         when "ruby"
-          { bg: "#fff7ed", fg: "#7c2d12", border: "#fdba74" }
+          { bg: "#111827", fg: "#f9fafb", border: "#374151", accent: "#f59e0b" }
         when "ts", "js"
-          { bg: "#eff6ff", fg: "#1e3a8a", border: "#93c5fd" }
+          { bg: "#0f172a", fg: "#e2e8f0", border: "#334155", accent: "#60a5fa" }
         when "shell"
-          { bg: "#ecfeff", fg: "#155e75", border: "#67e8f9" }
+          { bg: "#0b1320", fg: "#e2e8f0", border: "#334155", accent: "#22d3ee" }
         when "yaml"
-          { bg: "#f5f3ff", fg: "#4c1d95", border: "#c4b5fd" }
+          { bg: "#141125", fg: "#e9d5ff", border: "#4c1d95", accent: "#a78bfa" }
         else
-          { bg: "#f1f5f9", fg: "#334155", border: "#e2e8f0" }
+          { bg: "#0f172a", fg: "#e2e8f0", border: "#334155", accent: "#64748b" }
+        end
+      end
+
+      def render_code_block(lang, code)
+        highlighted = highlight_code(lang, code)
+        "<code class=\"summary-code summary-code-#{lang}\" style=\"#{block_code_style(lang)}\">#{highlighted}</code>"
+      end
+
+      def highlight_code(lang, code)
+        normalized = normalize_code_lang(lang)
+        return escape_html(code.to_s) unless %w[ruby ts js shell yaml].include?(normalized)
+
+        tokens = tokenize_code(code.to_s, normalized)
+        tokens.map { |type, text| wrap_token(type, text) }.join
+      end
+
+      def wrap_token(type, text)
+        style = token_style(type)
+        escaped = escape_html(text)
+        return escaped if style.nil?
+
+        "<span style=\"#{style}\">#{escaped}</span>"
+      end
+
+      def token_style(type)
+        case type
+        when :comment then "color:#94a3b8;"
+        when :string then "color:#86efac;"
+        when :number then "color:#fca5a5;"
+        when :keyword then "color:#93c5fd;font-weight:600;"
+        when :method then "color:#fcd34d;"
+        when :constant then "color:#c4b5fd;"
+        when :symbol then "color:#f9a8d4;"
+        when :variable then "color:#67e8f9;"
+        when :yaml_key then "color:#fcd34d;font-weight:600;"
+        else nil
+        end
+      end
+
+      def tokenize_code(code, lang)
+        scanner = StringScanner.new(code)
+        tokens = []
+        patterns = token_patterns(lang)
+
+        until scanner.eos?
+          matched = false
+          patterns.each do |type, regex|
+            chunk = scanner.scan(regex)
+            next unless chunk
+
+            tokens << [type, chunk]
+            matched = true
+            break
+          end
+          next if matched
+
+          tokens << [nil, scanner.getch]
+        end
+
+        tokens
+      end
+
+      def token_patterns(lang)
+        common = [
+          [:string, /"(?:\\.|[^"\\])*"/],
+          [:string, /'(?:\\.|[^'\\])*'/],
+          [:number, /\b\d+(?:\.\d+)?\b/],
+          [:identifier, /[a-zA-Z_]\w*/]
+        ]
+
+        case lang
+        when "ruby"
+          ruby_keywords = /\b(?:def|class|module|if|elsif|else|unless|case|when|while|until|do|end|begin|rescue|ensure|return|yield|super|self|nil|true|false|and|or|not|in)\b/
+          [
+            [:comment, /#[^\n]*/],
+            [:symbol, /:[a-zA-Z_]\w*[!?=]?/],
+            [:method, /\.[a-zA-Z_]\w*[!?=]?/],
+            [:constant, /\b[A-Z][A-Za-z0-9_]*\b/],
+            [:keyword, ruby_keywords]
+          ] + common
+        when "ts", "js"
+          js_keywords = /\b(?:const|let|var|function|return|if|else|switch|case|break|continue|for|while|do|try|catch|finally|throw|new|class|extends|implements|interface|type|import|from|export|default|async|await|null|undefined|true|false|this|typeof|instanceof)\b/
+          [
+            [:comment, %r{/\*[\s\S]*?\*/}],
+            [:comment, %r{//[^\n]*}],
+            [:method, /\.[a-zA-Z_$][\w$]*/],
+            [:constant, /\b[A-Z][A-Za-z0-9_]*\b/],
+            [:keyword, js_keywords]
+          ] + common
+        when "shell"
+          shell_keywords = /\b(?:if|then|else|elif|fi|for|in|do|done|case|esac|while|until|function|select|time|export|local|readonly|unset|return|exit)\b/
+          [
+            [:comment, /#[^\n]*/],
+            [:variable, /\$[A-Za-z_][A-Za-z0-9_]*/],
+            [:keyword, shell_keywords]
+          ] + common
+        when "yaml"
+          yaml_keywords = /\b(?:true|false|null|yes|no|on|off)\b/
+          [
+            [:comment, /#[^\n]*/],
+            [:yaml_key, /(?:^|\n)([ \t-]*[A-Za-z0-9_.-]+)(?=:\s|:$)/],
+            [:variable, /\$\{?[A-Za-z_][A-Za-z0-9_]*\}?/],
+            [:keyword, yaml_keywords]
+          ] + common
+        else
+          common
         end
       end
 

@@ -67,6 +67,17 @@ frontend:
     ecosystem: npm
     packages: [node, react, next, typescript]
 
+  # Repo-level advisories complement ecosystem advisories.
+  # Keep this list small: only repos with active/security-relevant advisories
+  # that are not reliably captured via ecosystem package filters.
+  github_repo_advisories:
+    - owner: facebook
+      repo: react
+      name: React
+    - owner: vercel
+      repo: next.js
+      name: Next.js
+
 backend:
   github_releases:
     - owner: golang
@@ -177,6 +188,13 @@ backend:
     ecosystem: rubygems
     packages: [pg, puma, redis, faraday, sidekiq, jwt, doorkeeper, devise, rails, rake, bundler]
 
+  # Repo-level advisories for core projects where security announcements
+  # may appear at repository level in addition to RubyGems advisories.
+  github_repo_advisories:
+    - owner: rails
+      repo: rails
+      name: Ruby on Rails
+
 devops:
   github_releases:
     # Database/cache servers (distinct from backend pg gem / redis-rb client)
@@ -187,6 +205,9 @@ devops:
     - owner: redis
       repo: redis
       name: Redis (server)
+    - owner: valkey-io
+      repo: valkey
+      name: Valkey (server)
     - owner: helm
       repo: helm
       name: Helm
@@ -217,6 +238,7 @@ devops:
     - owner: kubernetes
       repo: kubernetes
       name: Kubernetes
+      release_notes_path_template: "CHANGELOG/CHANGELOG-%{major}.%{minor}.md"
     - owner: hashicorp
       repo: terraform
       name: Terraform
@@ -284,4 +306,30 @@ devops:
 
   github_advisories:
     ecosystem: go
-    packages: [github.com/containerd/containerd, github.com/opencontainers/runc, k8s.io/kubernetes, github.com/hashicorp/terraform, github.com/docker/cli]
+    packages:
+      - github.com/containerd/containerd
+      - github.com/opencontainers/runc
+      - k8s.io/kubernetes
+      - github.com/hashicorp/terraform
+      - github.com/opentofu/opentofu
+      - github.com/docker/cli
+      - github.com/moby/moby
+      - helm.sh/helm/v3
+      - github.com/grafana/grafana
+      - github.com/argoproj/argo-cd/v2
+
+  # C/server projects are not consistently represented in ecosystem advisories.
+  # Track their repository-level security advisories directly.
+  github_repo_advisories:
+    - owner: valkey-io
+      repo: valkey
+      name: Valkey
+    - owner: postgres
+      repo: postgres
+      name: PostgreSQL
+    - owner: redis
+      repo: redis
+      name: Redis
+    - owner: nginx
+      repo: nginx
+      name: Nginx

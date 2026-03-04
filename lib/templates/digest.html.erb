@@ -136,9 +136,9 @@
                                         <div class="summary-part" style="<%= summary_part_style %>">
                                           <% if label %>
                                             <div class="summary-part-label" style="<%= summary_part_label_style %>"><%= label %></div>
-                                            <div class="summary-part-body" style="<%= summary_part_body_style %>"><%= format_summary_content(truncate_text(content.to_s, 1600)) %></div>
+                                            <div class="summary-part-body" style="<%= summary_part_body_style %>"><%= format_summary_content(truncate_text(content.to_s, 1600), item[:source_url]) %></div>
                                           <% else %>
-                                            <div class="summary-part-body" style="<%= summary_part_body_style %>"><%= format_summary_content(truncate_text(content.to_s, 1600)) %></div>
+                                            <div class="summary-part-body" style="<%= summary_part_body_style %>"><%= format_summary_content(truncate_text(content.to_s, 1600), item[:source_url]) %></div>
                                           <% end %>
                                         </div>
                                       <% end %>
@@ -170,7 +170,8 @@
             </tr>
             <tr>
               <td style="<%= footer_style %>">
-                <a href="https://github.com/william-eth/web_tech_feeder" style="<%= footer_link_style %>">Web Tech Feeder</a> · AI-powered digest
+                <a href="https://github.com/william-eth/web_tech_feeder" style="<%= footer_link_style %>">Web Tech Feeder</a> · AI-powered digest<%= project_version ? " · v#{project_version}" : "" %>
+                <p style="margin:10px 0 0 0;font-size:10px;color:#94a3b8;line-height:1.4;">This digest is AI-generated. Please verify important information before making decisions.</p>
               </td>
             </tr>
           </table>
