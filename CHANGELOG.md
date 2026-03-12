@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-03-13
+
 ### Added
 - **Security intelligence sub-section (🔒 資安情報)**: Added dedicated security block per category (Frontend/Backend/DevOps), displayed alongside "版本釋出" and "其他動態", with empty-state fallback.
 - **Advisory summary format (🛡️/⚔️/🔧)**: Added security-only three-block summary structure and renderer-side label normalization for advisory cards.
@@ -212,7 +214,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.0...HEAD
+[1.2.0]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...1.0.1
 [1.0.0]: https://github.com/william-eth/web_tech_feeder/compare/0.1.5...1.0.0
