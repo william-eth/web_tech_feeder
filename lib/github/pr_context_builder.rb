@@ -85,7 +85,8 @@ module WebTechFeeder
         pr = fetch_pr_meta.call(number)
         return nil unless pr
 
-        files = fetch_pr_files.call(number, max_pr_files_no_token, "#{pr_files_log_tag_prefix} #{owner}/#{repo}##{number}")
+        files = fetch_pr_files.call(number, max_pr_files_no_token,
+                                    "#{pr_files_log_tag_prefix} #{owner}/#{repo}##{number}")
         WebTechFeeder::Github::PrCompareFormatter.format(
           pr: pr,
           files: files || [],

@@ -87,7 +87,7 @@ Use a two-layer security source strategy for DevOps:
 
 ### Rationale
 
-- Common DevOps tools (Kubernetes, Terraform, containerd, Docker CLI, Helm, Grafana, ArgoCD) are written in Go
+- Common DevOps tools (Kubernetes, OpenTofu, containerd, Docker CLI, Helm, Grafana, ArgoCD) are written in Go
 - GitHub Advisory Database supports Go ecosystem filtering by module path
 - Some infrastructure/server projects publish advisories at repository level and are not reliably covered by ecosystem package filters
 
@@ -99,7 +99,6 @@ packages:
   - github.com/containerd/containerd
   - github.com/opencontainers/runc
   - k8s.io/kubernetes
-  - github.com/hashicorp/terraform
   - github.com/opentofu/opentofu
   - github.com/docker/cli
   - github.com/moby/moby
@@ -343,6 +342,38 @@ Extract pipeline log rendering into a reusable formatter and reduce repetitive r
   - Dry-run preview highlight output
 - Added `Utils::LogTagStyler` for colorized tags (for example `pr-files`, `linked-refs`, compare-related tags)
 - Runtime/collection logs now avoid repeating CID on every adjacent line while keeping run-level context at key points
+
+---
+
+## 16. Security Advisory Fallback & Enrichment
+
+### Decision
+
+Treat security coverage as a layered pipeline, not a single AI-output dependency.
+
+### Rationale
+
+- AI summaries can occasionally miss explicit CVE/GHSA items
+- Release/news entries can contain critical security fixes that still need dedicated advisory cards
+- CVSS quality varies by upstream source; using multiple trusted feeds improves reliability
+
+### Implementation
+
+- **Processor guardrail (`BaseProcessor`)**:
+  - Prioritize CVE/GHSA items before prompt truncation
+  - If AI output lacks a qualified advisory item, inject one from high-signal raw items
+  - Build advisory summaries with structured blocks (🛡️/⚔️/🔧)
+- **Filter safety net (`DigestFilter`)**:
+  - If no advisory survives upstream, synthesize advisory entries from explicit CVE/GHSA items
+  - Keep release/security/other splitting deterministic with dedicated caps and importance thresholds
+- **CVSS enrichment (`Utils::CveEnricher`)**:
+  - Primary source: NVD API 2.0
+  - Fallback source: Amazon Linux Security Center (ALAS)
+  - Preserve source attribution and reuse CVE descriptions when raw body content is template-like or low-signal
+- **Renderer normalization (`TemplateRenderer`)**:
+  - Enforce security block labels and CVSS/risk lines
+  - Link CVE references to `cve.org`
+  - Normalize markdown/bullet formatting for email-client consistency
 
 ---
 

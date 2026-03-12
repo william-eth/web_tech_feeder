@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Security intelligence sub-section (🔒 資安情報)**: Added dedicated security block per category (Frontend/Backend/DevOps), displayed alongside "版本釋出" and "其他動態", with empty-state fallback.
+- **Advisory summary format (🛡️/⚔️/🔧)**: Added security-only three-block summary structure and renderer-side label normalization for advisory cards.
+- **Advisory metadata pipeline**: `Item` now supports `metadata`; GitHub advisory collectors pass CVE/CVSS/severity/version-range metadata into AI prompt input.
+- **Security caps and thresholds**: Added `MAX_SECURITY_PER_CATEGORY` and `SECURITY_MIN_IMPORTANCE` in `DigestLimits`.
+- **CVSS enrichment (`Utils::CveEnricher`)**: Fallback advisories fetch real CVSS scores from the NVD API 2.0, with Amazon Linux Security Center (ALAS) as a secondary source when NVD has no data. Both sources also extract CVE descriptions for use when raw body content is low-quality. Run-level cache, timeout, and retry; ALAS results are annotated with source labels.
+
+### Fixed
+- **Security fallback reliability**: Processor now prioritizes CVE/GHSA items before AI truncation, and avoids dropping advisory entries during URL dedup. Fallback candidate selection now strongly prefers items carrying explicit CVE/GHSA IDs over items with only keyword-level signals, preventing weak candidates from being chosen and subsequently rejected by the filter.
+- **Missing advisory when CVE appears in release/news**: Added filter-level advisory injection fallback from explicit CVE/GHSA items when upstream output contains no advisory.
+- **Advisory items dropped by filtering**: Advisory items now bypass the general importance filter and use security-specific thresholds; low-importance AI advisories no longer block fallback advisory injection.
+- **Release duplication**: Added release deduplication by normalized project+version key with source-url fallback when version is unavailable.
+- **Framework badge correctness for advisories**: Expanded fallback framework inference (Docker/Moby, Go, PostgreSQL, Redis/Valkey, Grafana, Amazon EKS AMI, React, Next.js).
+- **Rendered summary corruption**: Fixed GitHub issue-ref linkification regex so CSS color fragments (e.g. `color:#0369a1`) are not transformed into issue links.
+- **Advisory card quality guardrails**: Filter now drops advisory items without explicit security material and avoids generic low-signal security cards.
+- **Advisory CVSS always "無法確認"**: Fallback advisories now display real CVSS scores from NVD/ALAS when available, falling back to AI estimation only when both sources do not provide scores.
+- **Redundant/low-signal vulnerability description**: `extract_security_description` now extracts structured section headers and substantive explanations instead of bare CVE reference sentences; duplicate CVE bullets are suppressed, and GitHub template field labels/bodies are skipped.
+
+### Changed
+- **Security rule maintainability**: Extracted shared CVE/GHSA/security-signal helpers to `Utils::SecuritySignal` and reused them in processor/filter paths to reduce rule drift.
+- **Prompt and routing policy**: Prompt now requires separate advisory entries for explicit CVE/GHSA fixes; release summaries stay focused on non-security highlights.
+- **Security section rendering behavior**: Security summaries enforce CVSS/risk lines and convert fallback 📌/🔍/📊 structures to 🛡️/⚔️/🔧 for consistent presentation.
+- **Linking and formatting**: CVE references now link to `cve.org`; markdown bold (`**x**` and malformed `*x**`) and grouped bullet indentation/spacing are normalized in renderer output.
+- **Release/readability normalization**: Version-like tags (e.g. `v3_4_9`) are normalized for display (`v3.4.9`) in titles and summary text.
+- **DevOps security source scope**: Removed Terraform/HashiCorp bulletin inputs from active collection while retaining OpenTofu sources.
+- **Internal refactor (no behavior change)**: Simplified repeated constants/helpers in `BaseProcessor` and `Utils::CveEnricher`, and unified `DigestFilter` security-signal checks through `Utils::SecuritySignal`.
+
+### Documentation
+- Updated `docs/PLAN.md` with the security advisory fallback/enrichment architecture (AI output guardrail, filter safety net, NVD+ALAS enrichment path, and rendering normalization responsibilities).
+
 ## [1.1.0] - 2026-03-04
 
 ### Added

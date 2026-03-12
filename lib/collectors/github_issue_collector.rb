@@ -97,7 +97,9 @@ module WebTechFeeder
         end
         selected = ranked.first(limit)
         dropped = [issues.size - selected.size, 0].max
-        logger.info("#{cid_tag}[issue-context] selected=#{selected.size} dropped=#{dropped} cap=#{limit}") if dropped.positive?
+        if dropped.positive?
+          logger.info("#{cid_tag}[issue-context] selected=#{selected.size} dropped=#{dropped} cap=#{limit}")
+        end
         selected
       end
 
@@ -116,9 +118,9 @@ module WebTechFeeder
       def build_item(issue, owner, repo, name)
         is_pr = issue.key?("pull_request")
         type_label = is_pr ? "PR" : "Issue"
-        state = issue["state"]
+        issue["state"]
         created_at = safe_parse_time(issue["created_at"])
-        updated_at = safe_parse_time(issue["updated_at"])
+        safe_parse_time(issue["updated_at"])
 
         labels = (issue["labels"] || []).map { |l| l["name"] }.join(", ")
         label_text = labels.empty? ? "" : " [#{labels}]"
@@ -146,9 +148,7 @@ module WebTechFeeder
         comments_count = issue["comments"] || 0
         logger.info("#{cid_tag}[issue-context] #{owner}/#{repo}##{issue['number']} type=#{issue.key?('pull_request') ? 'PR' : 'Issue'} comments=#{comments_count}")
 
-        if comments_count.zero?
-          return header + truncate_body(body, max_length: 3500)
-        end
+        return header + truncate_body(body, max_length: 3500) if comments_count.zero?
 
         comments = fetch_comments(owner, repo, issue["number"])
         return header + truncate_body(body, max_length: 500) if comments.nil?
@@ -191,7 +191,8 @@ module WebTechFeeder
             )
           },
           fetch_pr_meta: lambda { |number|
-            github_client.fetch_pr_meta(owner, repo, number, error_log: "Failed to fetch PR compare for #{owner}/#{repo}##{number}")
+            github_client.fetch_pr_meta(owner, repo, number,
+                                        error_log: "Failed to fetch PR compare for #{owner}/#{repo}##{number}")
           },
           fetch_pr_files: lambda { |number, max_no_token, pagination_log_tag|
             github_client.fetch_pr_files(
@@ -227,7 +228,6 @@ module WebTechFeeder
           empty_on_error: nil
         )
       end
-
     end
   end
 end

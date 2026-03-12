@@ -44,7 +44,9 @@ module WebTechFeeder
         jobs << rss_feeds_job(category, source_config[:rss_feeds]) if source_config[:rss_feeds]&.any?
         jobs << rubygems_job(source_config[:rubygems]) if source_config[:rubygems]&.any?
         jobs << github_advisories_job(source_config[:github_advisories]) if source_config[:github_advisories]
-        jobs << github_repo_advisories_job(source_config[:github_repo_advisories]) if source_config[:github_repo_advisories]&.any?
+        if source_config[:github_repo_advisories]&.any?
+          jobs << github_repo_advisories_job(source_config[:github_repo_advisories])
+        end
         jobs
       end
 

@@ -33,15 +33,13 @@ module WebTechFeeder
         raise ArgumentError, "EMAIL_FROM is required and cannot be blank" if from_addr.empty?
 
         bcc_addrs = parse_email_list(config.email_bcc)
-        logger.info("Sending digest email to #{to_addrs.join(', ')}#{bcc_addrs.any? ? " bcc #{bcc_addrs.join(', ')}" : ''}")
+        logger.info("Sending digest email to #{to_addrs.join(', ')}#{" bcc #{bcc_addrs.join(', ')}" if bcc_addrs.any?}")
 
         mail = build_mail(html_body, subject, from_addr, to_addrs, bcc_addrs)
         raw_rfc2822 = mail.encoded
         # Mail gem omits Bcc from encoded output by default. Gmail API requires Bcc in the
         # raw payload to deliver; inject the header before the body (first \r\n\r\n).
-        if bcc_addrs.any?
-          raw_rfc2822 = raw_rfc2822.sub(/\r?\n\r?\n/, "\r\nBcc: #{bcc_addrs.join(', ')}\r\n\r\n")
-        end
+        raw_rfc2822 = raw_rfc2822.sub(/\r?\n\r?\n/, "\r\nBcc: #{bcc_addrs.join(', ')}\r\n\r\n") if bcc_addrs.any?
         raw_rfc2822 = raw_rfc2822.gsub(/\r?\n/, "\r\n") unless raw_rfc2822.include?("\r\n")
 
         # Pass raw RFC 2822 string; google-apis-gmail_v1 encodes it to base64url automatically
@@ -133,8 +131,10 @@ module WebTechFeeder
           next 0 unless section.is_a?(Hash)
 
           releases = section[:release_items]&.size || 0
+          security = section[:security_items]&.size || 0
           others = section[:other_items]&.size || 0
-          releases + others > 0 ? releases + others : (section[:items]&.size || 0)
+          total = releases + security + others
+          total > 0 ? total : (section[:items]&.size || 0)
         end
       end
 
@@ -147,13 +147,16 @@ module WebTechFeeder
         }.fetch(importance, importance)
       end
 
-      # Split summary into structured parts (📌 核心重點 / 🔍 技術細節 / 📊 建議動作)
+      # Split summary into structured parts.
+      # Supports two formats:
+      #   Format A (non-advisory): 📌 核心重點 / 🔍 技術細節 / 📊 建議動作
+      #   Format B (advisory):     🛡️ 漏洞說明 / ⚔️ 攻擊方式 / 🔧 修正建議
       # Returns array of [label, content]; if no structure detected, returns [[nil, full_summary]]
       def summary_parts(summary)
         text = summary.to_s.strip
         return [[nil, ""]] if text.empty?
 
-        parts = text.split(/(?=📌|🔍|📊)/).map(&:strip).reject(&:empty?)
+        parts = text.split(/(?=📌|🔍|📊|🛡️|⚔️|🔧)/).map(&:strip).reject(&:empty?)
         return [[nil, text]] if parts.empty?
 
         structured = parts.map do |p|
@@ -163,10 +166,67 @@ module WebTechFeeder
             ["🔍 技術細節", normalize_block_content(p, icon: "🔍", heading: "技術細節")]
           elsif p.start_with?("📊")
             ["📊 建議動作", normalize_block_content(p, icon: "📊", heading: "建議動作")]
+          elsif p.start_with?("🛡️")
+            ["🛡️ 漏洞說明", normalize_block_content(p, icon: "🛡️", heading: "漏洞說明")]
+          elsif p.start_with?("⚔️")
+            ["⚔️ 攻擊方式", normalize_block_content(p, icon: "⚔️", heading: "攻擊方式")]
+          elsif p.start_with?("🔧")
+            ["🔧 修正建議", normalize_block_content(p, icon: "🔧", heading: "修正建議")]
           end
         end.compact
 
         structured.any? ? structured : [[nil, text]]
+      end
+
+      # Enforce security subsection labels as 🛡️ / ⚔️ / 🔧.
+      # If upstream summary uses generic 📌 / 🔍 / 📊, map labels while preserving content.
+      def security_summary_parts(summary, importance: nil)
+        parts = summary_parts(summary)
+        labels = parts.map(&:first).compact
+        normalized = if labels.any? { |label| label.start_with?("🛡️", "⚔️", "🔧") }
+                       parts
+                     else
+                       label_map = {
+                         "📌 核心重點" => "🛡️ 漏洞說明",
+                         "🔍 技術細節" => "⚔️ 攻擊方式",
+                         "📊 建議動作" => "🔧 修正建議"
+                       }
+                       parts.map { |label, content| [label_map[label] || label, content] }
+                     end
+
+        enforce_security_cvss(normalized, importance)
+      end
+
+      def enforce_security_cvss(parts, importance)
+        return parts if parts.empty?
+
+        parts.map.with_index do |(label, content), idx|
+          next [label, content] unless idx.zero? || label.to_s.start_with?("🛡️")
+
+          [label, ensure_cvss_line(content, importance)]
+        end
+      end
+
+      def ensure_cvss_line(content, importance)
+        text = content.to_s.strip
+        return text if text.match?(/\bcvss\b/i)
+
+        inferred = inferred_severity_from_importance(importance)
+        risk_line = inferred.nil? ? "• 風險等級：無法確認（AI 判斷）" : "• 風險等級：#{inferred}（AI 判斷）"
+
+        if text.empty?
+          "#{risk_line}\n• CVSS：無法確認"
+        else
+          "#{risk_line}\n• CVSS：無法確認\n#{text}"
+        end
+      end
+
+      def inferred_severity_from_importance(importance)
+        case importance.to_s.downcase
+        when "critical" then "Critical"
+        when "high" then "High"
+        when "medium" then "Medium"
+        end
       end
 
       # Remove duplicated heading text from block content, e.g.
@@ -192,11 +252,11 @@ module WebTechFeeder
         # If we cut inside (#\d+) or #\d+, extend to include the full ref or trim the partial
         rest = cleaned[max_length..]
         if cut =~ /\(#\d*$/
-          if rest && rest.match?(/\A(\d*)\)/)
-            cut = "#{cut}#{Regexp.last_match(1)})"
-          else
-            cut = cut.sub(/\(#\d*$/, "")
-          end
+          cut = if rest && rest.match?(/\A(\d*)\)/)
+                  "#{cut}#{Regexp.last_match(1)})"
+                else
+                  cut.sub(/\(#\d*$/, "")
+                end
         elsif cut =~ /#\d*$/ && rest && rest.match?(/\A(\d+)/)
           cut = "#{cut}#{Regexp.last_match(1)}"
         else
@@ -204,6 +264,40 @@ module WebTechFeeder
           cut = cleaned[0...last_space].rstrip if last_space && (max_length - last_space) < 15
         end
         "#{cut}..."
+      end
+
+      # Normalize version-like tag formatting for readability in rendered titles.
+      # Example: v3_4_9 -> v3.4.9
+      def display_title(title)
+        title.to_s.gsub(/(?<=\d)_(?=\d)/, ".")
+      end
+
+      def framework_badge_text(item)
+        explicit = item[:framework_or_package].to_s.strip
+        return explicit unless explicit.empty?
+
+        title = item[:title].to_s.strip
+        source = item[:source_name].to_s.strip
+
+        # Prefer title-derived framework/package for release-like titles.
+        if (m = title.match(/\A(.+?)\s+v?\d[\w.-]*\s+released\z/i))
+          return normalize_framework_name(m[1])
+        end
+        if (m = title.match(/\A(.+?)\s+release[\w.-]*\s+released\z/i))
+          return normalize_framework_name(m[1])
+        end
+
+        if (m = title.match(/\A([A-Za-z][A-Za-z0-9.+_-]{1,40})\s+/))
+          candidate = normalize_framework_name(m[1])
+          return candidate unless candidate.empty?
+        end
+
+        # Fallback from GitHub source naming: "GitHub - owner/repo"
+        if (m = source.match(%r{\AGitHub - [^/]+/([A-Za-z0-9._-]+)\z}))
+          return normalize_framework_name(m[1])
+        end
+
+        ""
       end
 
       # Shorten a URL for display (remove protocol, truncate path)
@@ -219,8 +313,18 @@ module WebTechFeeder
 
       def github_repo_base_url(url)
         return nil if url.to_s.strip.empty?
-        base = url.to_s.strip.sub(%r{/releases/.*}, "").sub(%r{/issues/.*}, "").sub(%r{/pull/.*}, "").sub(%r{/tree/.*}, "").sub(%r{/blob/.*}, "").sub(%r{/\z}, "")
+
+        base = url.to_s.strip.sub(%r{/releases/.*}, "").sub(%r{/issues/.*}, "").sub(%r{/pull/.*}, "").sub(%r{/tree/.*}, "").sub(%r{/blob/.*}, "").sub(
+          %r{/\z}, ""
+        )
         base.match?(%r{\Ahttps?://github\.com/[^/]+/[^/]+}) ? base : nil
+      end
+
+      def linkify_cve_refs(html)
+        link_style = item_title_link_style
+        html.gsub(/CVE-\d{4}-\d{4,}/) do |cve_id|
+          "<a href=\"https://www.cve.org/CVERecord?id=#{cve_id}\" style=\"#{link_style}\">#{cve_id}</a>"
+        end
       end
 
       def linkify_github_refs(html, repo_url)
@@ -231,10 +335,12 @@ module WebTechFeeder
         link_style = item_title_link_style
         # (#12345) first, then standalone #12345 — use placeholders to avoid double-replace
         html = html.gsub(/\(#(\d+)\)/) { "__PAREN_REF_#{Regexp.last_match(1)}__" }
-        html = html.gsub(/(?<![#"\/\w&;])(#(\d+))(?!\d)/) do
+        html = html.gsub(%r{(?<![#"/\w&;:])(#(\d+))(?!\d)}) do
           "<a href=\"#{issues_url}#{Regexp.last_match(2)}\" style=\"#{link_style}\">##{Regexp.last_match(2)}</a>"
         end
-        html.gsub(/__PAREN_REF_(\d+)__/) { "(<a href=\"#{issues_url}#{Regexp.last_match(1)}\" style=\"#{link_style}\">##{Regexp.last_match(1)}</a>)" }
+        html.gsub(/__PAREN_REF_(\d+)__/) do
+          "(<a href=\"#{issues_url}#{Regexp.last_match(1)}\" style=\"#{link_style}\">##{Regexp.last_match(1)}</a>)"
+        end
       end
 
       # Format summary content: escape HTML, convert ```...``` to block code, `...` to inline code.
@@ -244,9 +350,9 @@ module WebTechFeeder
 
         # Normalize pre-escaped entities from upstream content (e.g. &#39;)
         # before escaping again for safe HTML rendering.
-        normalized_text = CGI.unescapeHTML(text.to_s)
+        normalized_text = normalize_version_tags(CGI.unescapeHTML(text.to_s))
         blocks = []
-        with_placeholders = normalized_text.gsub(/```([a-zA-Z0-9_+\-]*)\s*\n?(.*?)```/m) do
+        with_placeholders = normalized_text.gsub(/```([a-zA-Z0-9_+-]*)\s*\n?(.*?)```/m) do
           lang = normalize_code_lang(Regexp.last_match(1))
           code = Regexp.last_match(2).to_s.strip.gsub(/\r\n?/, "\n")
           idx = blocks.length
@@ -256,7 +362,7 @@ module WebTechFeeder
 
         escaped = escape_html(with_placeholders)
         # Preserve paragraph breaks so blocks render with visual separation
-        escaped = escaped.gsub(/\r\n?/, "\n").gsub(/\n{2,}/, "<br>").gsub(/\n/, "<br>")
+        escaped = escaped.gsub(/\r\n?/, "\n").gsub(/\n{2,}/, "<br>").gsub("\n", "<br>")
 
         # Preserve leading indentation for nested bullet lines.
         # HTML collapses normal spaces, so convert line-start spaces to &nbsp;.
@@ -265,8 +371,9 @@ module WebTechFeeder
         end
 
         # Convert Markdown list items (- or *) to bullet points (•)
-        escaped = escaped.gsub(/(?:^|<br>)\s*(?:-|\*)\s+/) { |m| m.sub(/[-*]/, '•') }
+        escaped = escaped.gsub(/(?:^|<br>)\s*(?:-|\*)\s+/) { |m| m.sub(/[-*]/, "•") }
 
+        escaped = linkify_cve_refs(escaped)
         escaped = linkify_github_refs(escaped, github_repo_url) if github_repo_url.to_s.strip != ""
 
         # Emphasize grouped labels in technical details to improve scanability.
@@ -276,8 +383,9 @@ module WebTechFeeder
         end
         escaped = escaped.gsub(
           %r{(<span class="summary-group-label"[^>]*>[^<]+</span>)(?:<br>(?:&nbsp;|\s)*)+},
-          '\1'
+          '\1&nbsp;&nbsp;'
         )
+        escaped = apply_markdown_bold(escaped)
 
         with_inline = escaped.gsub(/`([^`\n]+)`/) do
           "<code class=\"summary-inline-code\" style=\"#{inline_code_style}\">#{Regexp.last_match(1)}</code>"
@@ -339,6 +447,14 @@ module WebTechFeeder
         "font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;padding:14px 0 8px 0;mso-line-height-rule:exactly;"
       end
 
+      def security_subsection_title_style
+        "font-size:12px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;padding:14px 0 8px 0;mso-line-height-rule:exactly;"
+      end
+
+      def inline_empty_security_style
+        "padding:2px 0 10px 0;color:#94a3b8;font-size:12px;"
+      end
+
       def item_style(importance)
         base = "padding:14px 16px;border-radius:4px;border:1px solid #e2e8f0;border-left:3px solid #94a3b8;background:#f8fafc;"
         color = case importance.to_s.downcase
@@ -393,6 +509,10 @@ module WebTechFeeder
 
       def summary_group_label_style
         "display:block;font-weight:700;color:#1e293b;margin:0;line-height:1.25;"
+      end
+
+      def summary_strong_style
+        "font-weight:700;color:#0f172a;"
       end
 
       def item_source_style
@@ -503,7 +623,6 @@ module WebTechFeeder
         when :symbol then "color:#f9a8d4;"
         when :variable then "color:#67e8f9;"
         when :yaml_key then "color:#fcd34d;font-weight:600;"
-        else nil
         end
       end
 
@@ -579,6 +698,53 @@ module WebTechFeeder
 
       def get_binding
         binding
+      end
+
+      def normalize_version_tags(text)
+        text.to_s.gsub(/\bv(\d+(?:_\d+)+)\b/) do |_|
+          "v#{Regexp.last_match(1).tr('_', '.')}"
+        end
+      end
+
+      def apply_markdown_bold(html)
+        styled = html.gsub(/\*\*([^*\n<][^*\n<]*?)\*\*/) do
+          "<strong style=\"#{summary_strong_style}\">#{Regexp.last_match(1)}</strong>"
+        end
+        # Handle malformed tokens like *crypto** seen in some model outputs.
+        styled.gsub(/\*([A-Za-z0-9_.:+-]{2,40})\*\*/) do
+          "<strong style=\"#{summary_strong_style}\">#{Regexp.last_match(1)}</strong>"
+        end
+      end
+
+      def normalize_framework_name(value)
+        raw = value.to_s.strip
+        return "" if raw.empty?
+
+        normalized = raw.gsub(/\A[\[(]+|[\])]+\z/, "").strip
+        known = {
+          "ruby" => "Ruby",
+          "rails" => "Rails",
+          "nginx" => "Nginx",
+          "kubernetes" => "Kubernetes",
+          "opentofu" => "OpenTofu",
+          "grafana" => "Grafana",
+          "amazon eks ami" => "Amazon EKS AMI",
+          "eks ami" => "Amazon EKS AMI",
+          "argocd" => "ArgoCD",
+          "argo-cd" => "ArgoCD",
+          "node.js" => "Node.js",
+          "next.js" => "Next.js",
+          "typescript" => "TypeScript"
+        }
+        key = normalized.downcase
+        return known[key] if known[key]
+
+        # Humanize simple repo/package names.
+        if normalized.match?(/\A[a-z0-9._-]+\z/i)
+          return normalized.split(/[_-]/).map { |w| w.empty? ? w : w[0].upcase + w[1..] }.join(" ")
+        end
+
+        normalized
       end
     end
   end

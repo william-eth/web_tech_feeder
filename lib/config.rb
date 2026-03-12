@@ -2,7 +2,6 @@
 
 require "yaml"
 require "logger"
-require "thread"
 require_relative "utils/log_context"
 
 module WebTechFeeder
@@ -86,7 +85,7 @@ module WebTechFeeder
     end
 
     def email_bcc
-      ENV["EMAIL_BCC"]
+      ENV.fetch("EMAIL_BCC", nil)
     end
 
     # Dry-run mode: collect + process but skip email sending,
@@ -234,6 +233,5 @@ module WebTechFeeder
     def github_token_present?
       !github_token.to_s.strip.empty?
     end
-
   end
 end

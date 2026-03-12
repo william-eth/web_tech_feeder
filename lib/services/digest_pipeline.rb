@@ -31,14 +31,15 @@ module WebTechFeeder
         logger.info("[cid=#{config.run_id}] Looking back #{config.lookback_days} days in TPE since #{config.cutoff_time}")
         formatter.runtime_config(config)
 
-        formatter.phase("STEP 1/3", config.dry_run_from_cache? ? "Load cached collection" : "Collect data from all sources")
+        formatter.phase("STEP 1/3",
+                        config.dry_run_from_cache? ? "Load cached collection" : "Collect data from all sources")
         raw_data = if config.dry_run_from_cache?
-          load_collection_cache(config)
-        else
-          CategoryCollector.new(config).collect_all.tap do |data|
-            save_collection_cache(config, data) if config.dry_run?
-          end
-        end
+                     load_collection_cache(config)
+                   else
+                     CategoryCollector.new(config).collect_all.tap do |data|
+                       save_collection_cache(config, data) if config.dry_run?
+                     end
+                   end
         total = raw_data.values.sum(&:size)
         logger.info("[cid=#{config.run_id}] #{config.dry_run_from_cache? ? 'Loaded' : 'Collected'} #{total} items total across all categories")
 
@@ -54,7 +55,8 @@ module WebTechFeeder
         digest_data = processor.process(raw_data)
         digest_data = DigestFilter.new(config).apply(digest_data)
 
-        formatter.phase("STEP 3/3", (config.dry_run? || config.dry_run_from_cache?) ? "Render dry-run preview" : "Send digest email")
+        formatter.phase("STEP 3/3",
+                        config.dry_run? || config.dry_run_from_cache? ? "Render dry-run preview" : "Send digest email")
         config.project_version = project_version
         if config.dry_run? || config.dry_run_from_cache?
           save_preview(config, digest_data, formatter)
@@ -115,7 +117,9 @@ module WebTechFeeder
           return v if v != ""
 
           changelog = File.expand_path("../../CHANGELOG.md", __dir__)
-          first_version_line = File.foreach(changelog).find { |line| line.start_with?("## [") && !line.include?("Unreleased") }
+          first_version_line = File.foreach(changelog).find do |line|
+            line.start_with?("## [") && !line.include?("Unreleased")
+          end
           first_version_line&.match(/\[(.+?)\]/)&.captures&.first || "unknown"
         rescue StandardError
           "unknown"

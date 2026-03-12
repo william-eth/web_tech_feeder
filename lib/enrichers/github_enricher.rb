@@ -11,7 +11,7 @@ module WebTechFeeder
     # Used to enrich RSS entries linking to github.com/{owner}/{repo}/issues/{n} or /pull/{n}.
     class GithubEnricher
       GITHUB_ISSUE_URL = %r{\Ahttps?://(?:www\.)?github\.com/([^/]+)/([^/]+)/issues/(\d+)(?:\?\S*)?\z}i
-      GITHUB_PR_URL   = %r{\Ahttps?://(?:www\.)?github\.com/([^/]+)/([^/]+)/pull/(\d+)(?:\?\S*)?\z}i
+      GITHUB_PR_URL = %r{\Ahttps?://(?:www\.)?github\.com/([^/]+)/([^/]+)/pull/(\d+)(?:\?\S*)?\z}i
       MAX_COMMENTS_NO_TOKEN = 20
       MAX_PR_FILES_NO_TOKEN = 20
       MAX_LINKED_PR_REFS_NO_TOKEN = 5
@@ -21,17 +21,23 @@ module WebTechFeeder
           url.to_s.match?(GITHUB_ISSUE_URL) || url.to_s.match?(GITHUB_PR_URL)
         end
 
-        def enrich(url, logger: nil, github_token: nil, section_key: nil, section_patterns: nil, run_id: nil, deep_pr_crawl: true, cache_provider: nil)
+        def enrich(url, logger: nil, github_token: nil, section_key: nil, section_patterns: nil, run_id: nil,
+                   deep_pr_crawl: true, cache_provider: nil)
           return nil unless match?(url)
+
           client = build_client(github_token, logger, cache_provider, run_id)
-          logger&.info("#{cid_tag(run_id, cache_provider)}GitHub enricher token mode: #{client.token_present? ? 'full' : 'limited'}")
+          logger&.info("#{cid_tag(run_id,
+                                  cache_provider)}GitHub enricher token mode: #{client.token_present? ? 'full' : 'limited'}")
           logger&.info("#{cid_tag(run_id, cache_provider)}GitHub enricher deep_pr_crawl=#{deep_pr_crawl}")
 
           m = url.match(GITHUB_ISSUE_URL) || url.match(GITHUB_PR_URL)
           return nil unless m
 
-          owner, repo, number = m[1], m[2], m[3]
-          fetch_issue_with_comments(client, owner, repo, number, logger, section_key, section_patterns, run_id, deep_pr_crawl, cache_provider)
+          owner = m[1]
+          repo = m[2]
+          number = m[3]
+          fetch_issue_with_comments(client, owner, repo, number, logger, section_key, section_patterns, run_id,
+                                    deep_pr_crawl, cache_provider)
         rescue StandardError => e
           logger&.warn("GitHub enrich failed for #{url}: #{e.message}")
           nil
@@ -39,7 +45,8 @@ module WebTechFeeder
 
         private
 
-        def fetch_issue_with_comments(client, owner, repo, number, logger, section_key, section_patterns, run_id, deep_pr_crawl, cache_provider)
+        def fetch_issue_with_comments(client, owner, repo, number, logger, section_key, section_patterns, run_id,
+                                      deep_pr_crawl, cache_provider)
           # Fetch issue (works for both issue and PR)
           issue = client.fetch_issue_meta(
             owner,
@@ -48,7 +55,9 @@ module WebTechFeeder
             error_log: "GitHub issue fetch failed for #{owner}/#{repo}##{number}"
           )
           return nil unless issue
-          logger&.info("#{cid_tag(run_id, cache_provider)}[enricher-issue] #{owner}/#{repo}##{number} type=#{issue.key?('pull_request') ? 'PR' : 'Issue'}")
+
+          logger&.info("#{cid_tag(run_id,
+                                  cache_provider)}[enricher-issue] #{owner}/#{repo}##{number} type=#{issue.key?('pull_request') ? 'PR' : 'Issue'}")
 
           # Fetch comments
           comments = fetch_comments(client, owner, repo, number)
@@ -114,7 +123,7 @@ module WebTechFeeder
           )
         end
 
-        def format_issue_and_comments(issue, comments, compare_text, logger)
+        def format_issue_and_comments(issue, comments, compare_text, _logger)
           parts = []
 
           # Issue/PR body
@@ -147,8 +156,8 @@ module WebTechFeeder
         def cid_tag(run_id, cache_provider)
           Utils::LogContext.tag(
             run_id: run_id,
-            show_cid: (cache_provider&.respond_to?(:verbose_cid_logs?) && cache_provider.verbose_cid_logs?),
-            show_thread: (cache_provider&.respond_to?(:verbose_thread_logs?) && cache_provider.verbose_thread_logs?)
+            show_cid: cache_provider&.respond_to?(:verbose_cid_logs?) && cache_provider.verbose_cid_logs?,
+            show_thread: cache_provider&.respond_to?(:verbose_thread_logs?) && cache_provider.verbose_thread_logs?
           )
         end
 

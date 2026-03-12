@@ -87,8 +87,9 @@
                 <% visible_categories.each_with_index do |cat, idx| %>
                   <% section = digest_data[cat[:key]] %>
                   <% release_items = section[:release_items] || [] %>
+                  <% security_items = section[:security_items] || [] %>
                   <% other_items = section[:other_items] || [] %>
-                  <% item_count = release_items.size + other_items.size %>
+                  <% item_count = release_items.size + security_items.size + other_items.size %>
                   <% item_count = (section[:items]&.size || 0) if item_count.zero? %>
                   <% section_style_value = section_style.dup %>
                   <% section_style_value << "border-bottom:none;" if idx == visible_categories.length - 1 %>
@@ -108,30 +109,36 @@
                         <% if item_count.zero? %>
                           <p class="empty-state" style="<%= empty_state_style %>">本週暫無相關更新</p>
                         <% else %>
-                          <% [[ "版本釋出", release_items, true ], [ "其他動態", other_items, release_items.any? ]].each do |subsection_title, items, show_title| %>
-                            <% next if items.empty? %>
-                            <% if show_title %>
-                              <p class="subsection-title" style="<%= subsection_title_style %>"><%= subsection_title %></p>
+                          <% has_multiple_subsections = [release_items, security_items, other_items].count(&:any?) > 1 %>
+                          <% [[ "版本釋出", release_items, has_multiple_subsections, false ], [ "🔒 資安情報", security_items, true, true ], [ "其他動態", other_items, has_multiple_subsections, false ]].each do |subsection_title, items, show_title, always_show| %>
+                            <% next if items.empty? && !always_show %>
+                            <% if show_title || always_show %>
+                              <p class="subsection-title" style="<%= subsection_title == "🔒 資安情報" ? security_subsection_title_style : subsection_title_style %>"><%= subsection_title %></p>
+                            <% end %>
+                            <% if items.empty? && subsection_title == "🔒 資安情報" %>
+                              <p class="empty-state" style="<%= inline_empty_security_style %>">本週暫無中風險以上資安情報</p>
+                              <% next %>
                             <% end %>
                             <% items.each_with_index do |item, item_idx| %>
                               <% importance = (item[:importance] || "medium").downcase %>
-                              <% fw = item[:framework_or_package].to_s.strip %>
-                              <% show_fw_badge = !fw.empty? && subsection_title == "其他動態" %>
+                              <% fw = framework_badge_text(item) %>
+                              <% show_fw_badge = !fw.empty? %>
                               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" class="enhanced-item" style="<%= item_style(importance) %>;border-collapse:separate;">
                                 <tr>
                                   <td>
                                     <p class="item-title" style="<%= item_title_style %>">
                                       <% if show_fw_badge %><span class="framework-badge" style="<%= framework_badge_style %>"><%= fw %></span><% end %>
                                       <% if item[:source_url] && !item[:source_url].to_s.empty? %>
-                                        <a href="<%= item[:source_url] %>" style="<%= item_title_link_style %>"><%= truncate_text(item[:title].to_s, 180) %></a>
+                                        <a href="<%= item[:source_url] %>" style="<%= item_title_link_style %>"><%= truncate_text(display_title(item[:title].to_s), 180) %></a>
                                       <% else %>
-                                        <%= truncate_text(item[:title].to_s, 180) %>
+                                        <%= truncate_text(display_title(item[:title].to_s), 180) %>
                                       <% end %>
                                       <span class="importance-badge badge-<%= importance %>" style="<%= importance_badge_style(importance) %>"><%= importance_label(importance) %></span>
                                     </p>
 
                                     <div class="item-summary" style="<%= item_summary_style %>">
-                                      <% summary_parts(item[:summary]).each do |label, content| %>
+                                      <% rendered_parts = subsection_title == "🔒 資安情報" ? security_summary_parts(item[:summary], importance: item[:importance]) : summary_parts(item[:summary]) %>
+                                      <% rendered_parts.each do |label, content| %>
                                         <% next if content.to_s.strip.empty? %>
                                         <div class="summary-part" style="<%= summary_part_style %>">
                                           <% if label %>

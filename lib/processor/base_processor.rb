@@ -2,7 +2,9 @@
 
 require "erb"
 require "json"
+require_relative "../utils/cve_enricher"
 require_relative "../utils/item_type_inferrer"
+require_relative "../utils/security_signal"
 require_relative "../utils/text_truncator"
 
 module WebTechFeeder
@@ -80,12 +82,13 @@ module WebTechFeeder
       private
 
       def process_category(category, items)
-        limited = items.take(ITEMS_LIMIT_FOR_AI)
+        limited = prioritize_security_items(items).take(ITEMS_LIMIT_FOR_AI)
         prompt = build_category_prompt(category, limited)
         retries = 0
         begin
           text = call_api(prompt)
-          parse_response_text(text, category)
+          parsed = parse_response_text(text, category)
+          ensure_security_coverage(parsed, items)
         rescue Processor::FatalApiError
           raise
         rescue StandardError => e
@@ -105,6 +108,12 @@ module WebTechFeeder
         end
       end
 
+      # Move items with CVE/GHSA in title to front so they survive the
+      # ITEMS_LIMIT_FOR_AI truncation and reach the AI prompt.
+      def prioritize_security_items(items)
+        sec, rest = items.partition { |i| Utils::SecuritySignal.explicit_security_id_signal?(i.title) }
+        sec + rest
+      end
 
       PROMPT_TEMPLATE_PATH = File.expand_path("../prompts/category_digest.erb", __dir__)
 
@@ -113,7 +122,10 @@ module WebTechFeeder
         raw_data = format_items(items)
 
         template = File.read(PROMPT_TEMPLATE_PATH)
-        ERB.new(template, trim_mode: "-").result(binding)
+        ERB.new(template, trim_mode: "-").result_with_hash(
+          section_title: section_title,
+          raw_data: raw_data
+        )
       end
 
       # Per-item body truncation; enriched items (with comments) may be longer
@@ -131,9 +143,23 @@ module WebTechFeeder
             truncated = Utils::TextTruncator.truncate(body, max_length: BODY_TRUNCATE)
             lines << "  Body: #{truncated}"
           end
+          format_metadata_lines(lines, item.metadata) if item.respond_to?(:metadata) && item.metadata.is_a?(Hash)
           lines << ""
         end
         lines.join("\n")
+      end
+
+      def format_metadata_lines(lines, meta)
+        lines << "  CVE: #{meta[:cve_id]}" if meta[:cve_id]
+        lines << "  CVSS: #{meta[:cvss_score]}" if meta[:cvss_score]
+        lines << "  Severity: #{meta[:severity]}" if meta[:severity]
+        Array(meta[:vulnerabilities]).each do |v|
+          parts = []
+          parts << "pkg=#{v[:package]}" if v[:package]
+          parts << "range=#{v[:vulnerable_range]}" if v[:vulnerable_range]
+          parts << "patched=#{v[:patched_version]}" if v[:patched_version]
+          lines << "  Vulnerability: #{parts.join(', ')}" if parts.any?
+        end
       end
 
       def parse_response_text(text, category)
@@ -144,8 +170,8 @@ module WebTechFeeder
         extracted = extract_json_object(cleaned)
         parsed = try_parse_json(cleaned) ||
                  try_parse_json(extracted) ||
-                 try_parse_json(cleaned.gsub(/\\([^"\\\/bfnrtu])/, '\1')) ||
-                 (extracted && try_parse_json(extracted.gsub(/\\([^"\\\/bfnrtu])/, '\1')))
+                 try_parse_json(cleaned.gsub(%r{\\([^"\\/bfnrtu])}, '\1')) ||
+                 (extracted && try_parse_json(extracted.gsub(%r{\\([^"\\/bfnrtu])}, '\1')))
 
         raise "Invalid JSON in AI response for #{category}" unless parsed
 
@@ -153,6 +179,239 @@ module WebTechFeeder
         parsed[:items] ||= []
         parsed[:items].each { |item| normalize_item_type!(item) }
         parsed
+      end
+
+      ADVISORY_MIN_IMPORTANCE = %w[critical high medium].freeze
+      SECURITY_DETAILS_UNAVAILABLE = "來源未提供完整漏洞細節。"
+
+      def ensure_security_coverage(parsed, raw_items)
+        items = Array(parsed[:items])
+        return parsed if items.empty?
+
+        # Only count an existing advisory as sufficient when it has real
+        # security material AND its importance meets the minimum threshold.
+        # AI sometimes outputs advisory items with low importance that then
+        # get dropped by the general importance filter, leaving the security
+        # section empty.
+        has_qualified_advisory = items.any? do |item|
+          next false unless (item[:item_type] || "").downcase == "advisory"
+          next false unless ADVISORY_MIN_IMPORTANCE.include?((item[:importance] || "").downcase)
+
+          advisory_security_signal?(item[:title]) || advisory_security_signal?(item[:summary])
+        end
+        return parsed if has_qualified_advisory
+
+        existing_urls = items.map { |i| i[:source_url].to_s.strip }
+        candidate = pick_security_candidate(raw_items, existing_urls)
+        return parsed unless candidate
+
+        items << build_advisory_item_from_raw(candidate)
+        parsed[:items] = items.uniq { |i| [i[:source_url].to_s.strip, (i[:item_type] || "").downcase] }
+        parsed
+      end
+
+      # Select the best raw item for advisory fallback injection.
+      # Priority: explicit CVE/GHSA in body/title with unique URL >
+      # explicit CVE/GHSA anywhere > title-level signal with unique URL >
+      # any candidate with unique URL > any candidate.
+      def pick_security_candidate(raw_items, existing_urls = [])
+        candidates = Array(raw_items).select { |i| raw_explicit_security_candidate?(i) }
+        return nil if candidates.empty?
+
+        has_explicit_id = ->(i) { Utils::SecuritySignal.explicit_security_id_signal?(i.title) || Utils::SecuritySignal.explicit_security_id_signal?(i.body) }
+        unique_url = ->(i) { !existing_urls.include?(i.url.to_s.strip) }
+
+        candidates.find { |i| has_explicit_id.call(i) && unique_url.call(i) } ||
+          candidates.find { |i| has_explicit_id.call(i) } ||
+          candidates.find { |i| advisory_security_signal?(i.title) && unique_url.call(i) } ||
+          candidates.find { |i| unique_url.call(i) } ||
+          candidates.first
+      end
+
+      def raw_explicit_security_candidate?(item)
+        Utils::SecuritySignal.explicit_security_id_signal?(item.title) ||
+          Utils::SecuritySignal.explicit_security_id_signal?(item.body) ||
+          advisory_security_signal?(item.title) ||
+          advisory_security_signal?(item.body)
+      end
+
+      def advisory_security_signal?(text)
+        Utils::SecuritySignal.advisory_security_signal?(text)
+      end
+
+      def build_advisory_item_from_raw(item)
+        cve = extract_cve_id(item.title.to_s, item.body.to_s)
+        cvss = cve ? Utils::CveEnricher.fetch_cvss(cve, logger: logger) : nil
+        framework = infer_framework_from_source(item.source.to_s, item.title.to_s)
+        title = cve ? "#{framework} 安全性通報：#{cve}" : "#{framework} 安全性通報"
+        importance = cvss ? nvd_severity_to_importance(cvss[:severity]) : "high"
+
+        {
+          title: title,
+          summary: advisory_summary_from_raw(item, cve, cvss: cvss),
+          importance: importance,
+          item_type: "advisory",
+          framework_or_package: framework,
+          source_url: item.url,
+          source_name: item.source
+        }
+      end
+
+      NVD_SEVERITY_MAP = { "CRITICAL" => "critical", "HIGH" => "high", "MEDIUM" => "medium", "LOW" => "low" }.freeze
+
+      def nvd_severity_to_importance(severity)
+        NVD_SEVERITY_MAP[severity.to_s.upcase] || "high"
+      end
+
+      def advisory_summary_from_raw(item, cve, cvss: nil)
+        desc = extract_security_description(item.body.to_s)
+        # Prefer CVE description from enricher over low-quality raw body extraction
+        if cvss&.dig(:description) && (desc == SECURITY_DETAILS_UNAVAILABLE || github_template_body?(item.body.to_s))
+          desc = cvss[:description]
+        end
+
+        vuln_lines = ["🛡️ 漏洞說明"]
+        if cvss
+          cvss_label = "CVSS #{cvss[:score]}（#{cvss[:severity].capitalize}）"
+          cvss_label += "（來源：#{cvss[:source]}）" if cvss[:source] && cvss[:source] != "NVD"
+          vuln_lines << "• #{cvss_label}"
+        else
+          vuln_lines << "• 風險等級：High（AI 判斷）"
+          vuln_lines << "• CVSS：無法確認"
+        end
+        vuln_lines << "• #{cve} 相關漏洞通報。" if cve && !desc.include?(cve.to_s)
+        vuln_lines << "• #{desc}" unless desc == SECURITY_DETAILS_UNAVAILABLE && cve
+
+        [
+          *vuln_lines,
+          "⚔️ 攻擊方式",
+          "• 目前來源未提供完整攻擊鏈；建議視為可被濫用的已知弱點並優先處理。",
+          "🔧 修正建議",
+          "• 優先升級至來源公告建議版本。",
+          "• 短期緩解：限制外部輸入與高風險路徑，並加強監控告警。"
+        ].join("\n")
+      end
+
+      def extract_security_description(body)
+        return SECURITY_DETAILS_UNAVAILABLE if body.to_s.strip.empty?
+        return SECURITY_DETAILS_UNAVAILABLE if github_template_body?(body)
+
+        desc = extract_section_header_description(body)
+        return desc if desc
+
+        desc = extract_vulnerability_sentence(body)
+        return desc if desc
+
+        first = clean_summary(body)
+        return SECURITY_DETAILS_UNAVAILABLE if first.empty? || first.match?(/\Arelease notes:?/i)
+
+        first
+      end
+
+      # Look for a section header right before the CVE mention.
+      # Many security advisories use patterns like:
+      #   "crypto/x509: incorrect enforcement of email constraints\n\n- When verifying..."
+      #   "Buffer overflow in Zlib::GzipReader\n\nThe zstream_buffer_ungets function..."
+      def extract_section_header_description(body)
+        lines = body.to_s.split(/\n+/).map(&:strip).reject(&:empty?)
+        cve_line_idx = lines.index { |l| l.match?(/\bCVE-\d{4}-\d+\b/i) || l.match?(/\bThis is CVE-/i) }
+        return nil unless cve_line_idx
+
+        header = nil
+        explanation = nil
+
+        (cve_line_idx - 1).downto(0) do |i|
+          line = lines[i].sub(/\A\*{1,2}\s*/, "").sub(/\A[-•]\s*/, "").strip
+          next if line.empty? || line.match?(/\A(State:|Description:|---|###|http|<!-)/i)
+          next if github_template_field?(lines[i])
+
+          if line.length < 120 && !line.match?(/\.\s*\z/)
+            header = line
+            explanation = lines[i + 1] if lines[i + 1] && lines[i + 1] != lines[cve_line_idx]
+            break
+          end
+
+          next unless line.length >= 20 && Utils::SecuritySignal.vulnerability_keyword_signal?(line)
+
+          explanation = line
+          header_candidate = lines[i - 1] if i > 0
+          if header_candidate && header_candidate.length < 120 && !header_candidate.match?(/\.\s*\z/)
+            header = header_candidate
+          end
+          break
+        end
+
+        return nil unless header || explanation
+
+        parts = [header, explanation].compact.map { |s| truncate_to(s, 200) }
+        parts.join(". ").sub(/\.\.\z/, ".")
+      end
+
+      # Find the first sentence with a vulnerability keyword, skipping bare CVE reference lines.
+      def extract_vulnerability_sentence(body)
+        text = body.to_s.gsub(/\s+/, " ").strip
+        sentences = text.split(/(?<=[.!?])\s+/)
+
+        sentences.find do |s|
+          next false if s.match?(/\AThis is CVE-/i)
+          next false if s.strip.length < 15
+
+          Utils::SecuritySignal.vulnerability_keyword_signal?(s)
+        end&.strip
+      end
+
+      def truncate_to(text, max)
+        return text if text.length <= max
+
+        cut = text[0...max]
+        last_space = cut.rindex(" ")
+        cut = cut[0...last_space] if last_space && (max - last_space) < 20
+        "#{cut.rstrip}..."
+      end
+
+      # GitHub issue templates use bold field labels like
+      # "**What would you like to be added**:" that are not vulnerability descriptions.
+      def github_template_field?(raw_line)
+        raw_line.match?(/\A\s*\*{1,2}[^*]+\*{1,2}\s*:\s*\z/) && raw_line.strip.length < 60
+      end
+
+      # Detect GitHub issue bodies that are feature-request templates rather
+      # than security advisory prose. These typically contain template field
+      # markers and HTML comments with boilerplate instructions.
+      def github_template_body?(body)
+        text = body.to_s
+        text.include?("**What would you like") ||
+          text.include?("**Why is this needed") ||
+          text.include?("**Additional context") ||
+          text.match?(/<!--.*template.*-->/im)
+      end
+
+      def extract_cve_id(*texts)
+        texts.each do |text|
+          m = text.to_s.match(/\b(CVE-\d{4}-\d+)\b/i)
+          return m[1].upcase if m
+        end
+        nil
+      end
+
+      def infer_framework_from_source(source, title)
+        s = "#{source} #{title}".downcase
+        return "Ruby" if s.include?("ruby")
+        return "Rails" if s.include?("rails")
+        return "Node.js" if s.include?("node")
+        return "Nginx" if s.include?("nginx")
+        return "Kubernetes" if s.include?("kubernetes") || s.include?("k8s")
+        return "Docker" if s.include?("docker") || s.include?("moby")
+        return "OpenTofu" if s.include?("opentofu")
+        return "Go" if s.match?(/\bgo\b/)
+        return "PostgreSQL" if s.include?("postgres")
+        return "Redis" if s.include?("redis") || s.include?("valkey")
+        return "Grafana" if s.include?("grafana")
+        return "Amazon EKS AMI" if s.include?("eks-ami") || s.include?("eks ami") || s.include?("amazon-eks")
+        return "React" if s.include?("react")
+        return "Next.js" if s.include?("next.js") || s.include?("nextjs")
+
+        "Security"
       end
 
       def normalize_item_type!(item)
@@ -241,14 +500,10 @@ module WebTechFeeder
           title: title,
           summary: summary.empty? ? "#{item.source} - #{item.published_at&.strftime('%Y-%m-%d')}" : summary,
           importance: importance,
-          item_type: infer_item_type_from_raw(item),
+          item_type: infer_item_type(item),
           source_url: item.url,
           source_name: item.source
         }
-      end
-
-      def infer_item_type_from_raw(item)
-        Utils::ItemTypeInferrer.infer(item)
       end
 
       def clean_summary(body)

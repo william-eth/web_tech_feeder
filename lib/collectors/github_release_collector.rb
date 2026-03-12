@@ -82,7 +82,7 @@ module WebTechFeeder
           )
 
           Item.new(
-            title: "#{name} #{current_release['tag_name']} released",
+            title: "#{name} #{display_tag_name(current_release['tag_name'])} released",
             url: current_release["html_url"],
             published_at: published_at,
             body: build_release_context(owner, repo, current_release, previous_release),
@@ -94,6 +94,14 @@ module WebTechFeeder
       end
 
       private
+
+      def display_tag_name(tag_name)
+        raw = tag_name.to_s.strip
+        return raw if raw.empty?
+
+        # Normalize version-like tags (e.g. v3_4_9 -> v3.4.9) for readability.
+        raw.gsub(/(?<=\d)_(?=\d)/, ".")
+      end
 
       def fetch_with_retry(owner, repo)
         retries = 0
@@ -145,7 +153,7 @@ module WebTechFeeder
         return [nil, nil, nil] if tags.empty?
 
         enriched = tags.first(MAX_TAGS_SCAN).map do |tag|
-          tag_name = tag["name"].to_s
+          tag["name"].to_s
           published_at = fetch_tag_commit_time(owner, repo, tag)
           [tag, published_at]
         end.select { |_tag, published_at| recent?(published_at) }
@@ -199,7 +207,7 @@ module WebTechFeeder
           repo_config: repo_config
         )
 
-        sections = [base_body, local_notes_excerpt, external_notes_excerpt].map(&:to_s).map(&:strip).reject(&:empty?)
+        sections = [base_body, local_notes_excerpt, external_notes_excerpt].map { |x| x.to_s.strip }.reject(&:empty?)
         sections.join("\n\n")
       end
 
@@ -253,7 +261,7 @@ module WebTechFeeder
         candidates = body_urls.uniq
         return [] if candidates.empty?
 
-        allowed_domains = Array(repo_config[:release_notes_domains]).map(&:to_s).map(&:downcase).reject(&:empty?)
+        allowed_domains = Array(repo_config[:release_notes_domains]).map { |x| x.to_s.downcase }.reject(&:empty?)
         if allowed_domains.any?
           candidates = candidates.select do |url|
             host = parse_host(url)
@@ -276,7 +284,7 @@ module WebTechFeeder
       end
 
       def extract_urls(text)
-        text.to_s.scan(%r{https?://[^\s\)>\]]+}).map do |u|
+        text.to_s.scan(%r{https?://[^\s)>\]]+}).map do |u|
           u.gsub(/[.,;:!?]+\z/, "")
         end.uniq
       end
@@ -315,7 +323,7 @@ module WebTechFeeder
         plain = html.dup
         plain.gsub!(%r{<script.*?</script>}mi, " ")
         plain.gsub!(%r{<style.*?</style>}mi, " ")
-        plain.gsub!(%r{<[^>]+>}, " ")
+        plain.gsub!(/<[^>]+>/, " ")
         plain = CGI.unescapeHTML(plain)
         plain.gsub(/\s+/, " ").strip
       end
@@ -428,6 +436,7 @@ module WebTechFeeder
              ))
             return idx
           end
+
           idx += 1
         end
         nil
@@ -552,6 +561,7 @@ module WebTechFeeder
 
       def fetch_linked_references(owner, repo, numbers)
         return nil if numbers.empty?
+
         logger.info("#{cid_tag}#{styled_tag('linked-refs')} #{owner}/#{repo} resolving=#{numbers.size}")
 
         blocks = []
@@ -565,6 +575,7 @@ module WebTechFeeder
         end
 
         return nil if blocks.empty?
+
         logger.info("#{cid_tag}#{styled_tag('linked-refs')} #{owner}/#{repo} resolved=#{blocks.size}")
 
         "Linked PR/Issue references:\n#{blocks.join("\n\n")}"
@@ -598,7 +609,7 @@ module WebTechFeeder
         title = issue["title"].to_s.strip
         state = issue["state"]
         url = issue["html_url"]
-        labels = (issue["labels"] || []).map { |l| l["name"] }.compact
+        labels = (issue["labels"] || []).filter_map { |l| l["name"] }
         label_text = labels.empty? ? "" : " [#{labels.join(', ')}]"
 
         issue_body = issue["body"].to_s.strip
@@ -611,7 +622,7 @@ module WebTechFeeder
           "- [#{created}] @#{user}: #{truncate_body(text, max_length: 280)}"
         end
 
-        block = +"[#{type} ##{number}] #{title}#{label_text}\nState: #{state}\nURL: #{url}"
+        block = "[#{type} ##{number}] #{title}#{label_text}\nState: #{state}\nURL: #{url}"
         block << "\nBody: #{issue_body}" unless issue_body.empty?
         block << "\nComments:\n#{comment_lines.join("\n")}" if comment_lines.any?
         block
@@ -631,7 +642,6 @@ module WebTechFeeder
       def styled_tag(name)
         Utils::LogTagStyler.style(name)
       end
-
     end
   end
 end

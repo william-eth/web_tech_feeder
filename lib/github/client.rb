@@ -63,7 +63,8 @@ module WebTechFeeder
         nil
       end
 
-      def fetch_issue_comments(owner, repo, number, max_no_token:, max_with_token: nil, pagination_log_tag: nil, error_log: nil, empty_on_error: [])
+      def fetch_issue_comments(owner, repo, number, max_no_token:, max_with_token: nil, pagination_log_tag: nil,
+                               error_log: nil, empty_on_error: [])
         mode = token_present? ? "full" : "limited"
         token_cap = max_with_token.to_i.positive? ? max_with_token.to_i : "all"
         cache_key = "#{owner}/#{repo}##{number}:#{mode}:max#{max_no_token}:token_cap#{token_cap}"
@@ -83,7 +84,8 @@ module WebTechFeeder
         empty_on_error
       end
 
-      def fetch_pr_files(owner, repo, number, max_no_token:, pagination_log_tag: nil, error_log: nil, empty_on_error: [])
+      def fetch_pr_files(owner, repo, number, max_no_token:, pagination_log_tag: nil, error_log: nil,
+                         empty_on_error: [])
         mode = token_present? ? "full" : "limited"
         cache_key = "#{owner}/#{repo}##{number}:#{mode}:max#{max_no_token}"
         cache_fetch("gh_pr_files", cache_key) do
@@ -114,7 +116,7 @@ module WebTechFeeder
         page = 1
         all = []
         tag = log_tag ? Utils::LogTagStyler.style(log_tag) : nil
-        @logger&.info("#{cid_tag}#{tag} start full pagination#{max_items ? " max_items=#{max_items}" : ''}") if log_tag
+        @logger&.info("#{cid_tag}#{tag} start full pagination#{" max_items=#{max_items}" if max_items}") if log_tag
         loop do
           rows = get_json(path, per_page: 100, page: page)
           break if rows.empty?
@@ -247,17 +249,17 @@ module WebTechFeeder
         headers[key] || headers[key.upcase] || headers[key.split("-").map(&:capitalize).join("-")]
       end
 
-      def cache_fetch(namespace, key, &block)
+      def cache_fetch(namespace, key, &)
         return yield unless @cache_provider&.respond_to?(:cache_fetch)
 
-        @cache_provider.cache_fetch(namespace, key, &block)
+        @cache_provider.cache_fetch(namespace, key, &)
       end
 
       def cid_tag
         Utils::LogContext.tag(
           run_id: @run_id,
-          show_cid: (@cache_provider&.respond_to?(:verbose_cid_logs?) && @cache_provider.verbose_cid_logs?),
-          show_thread: (@cache_provider&.respond_to?(:verbose_thread_logs?) && @cache_provider.verbose_thread_logs?)
+          show_cid: @cache_provider&.respond_to?(:verbose_cid_logs?) && @cache_provider.verbose_cid_logs?,
+          show_thread: @cache_provider&.respond_to?(:verbose_thread_logs?) && @cache_provider.verbose_thread_logs?
         )
       end
     end

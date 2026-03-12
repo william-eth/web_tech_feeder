@@ -12,7 +12,7 @@ section_file_filters:
     - '(^|/)(gemfile|rakefile|puma|sidekiq)'
   devops:
     - '(^|/)\.github/workflows(/|$)'
-    - '(^|/)(infra|infrastructure|ops|deploy|deployment|k8s|kubernetes|helm|terraform|ansible)(/|$)'
+    - '(^|/)(infra|infrastructure|ops|deploy|deployment|k8s|kubernetes|helm|ansible)(/|$)'
     - '(^|/)(docker|compose|container)(/|$)'
     - '(^|/)(ci|cd|pipeline)(/|$)'
     - '(^|/)(chart|manifests?)(/|$)'
@@ -239,9 +239,6 @@ devops:
       repo: kubernetes
       name: Kubernetes
       release_notes_path_template: "CHANGELOG/CHANGELOG-%{major}.%{minor}.md"
-    - owner: hashicorp
-      repo: terraform
-      name: Terraform
     - owner: opentofu
       repo: opentofu
       name: OpenTofu
@@ -274,9 +271,6 @@ devops:
     - owner: kubernetes
       repo: kubernetes
       name: Kubernetes
-    - owner: hashicorp
-      repo: terraform
-      name: Terraform
     - owner: opentofu
       repo: opentofu
       name: OpenTofu
@@ -294,9 +288,6 @@ devops:
     # Official Kubernetes CVE feed (Kubernetes Security Response Committee)
     - url: https://kubernetes.io/docs/reference/issues-security/official-cve-feed/feed.xml
       name: Kubernetes Official CVE Feed
-    # HashiCorp security bulletins (Terraform, Vault, Consul, Nomad, etc.)
-    - url: https://discuss.hashicorp.com/c/security/52.rss
-      name: HashiCorp Security Bulletins
     - url: https://aws.amazon.com/blogs/aws/feed/
       name: AWS News Blog
     - url: https://aws.amazon.com/blogs/security/feed/
@@ -310,7 +301,6 @@ devops:
       - github.com/containerd/containerd
       - github.com/opencontainers/runc
       - k8s.io/kubernetes
-      - github.com/hashicorp/terraform
       - github.com/opentofu/opentofu
       - github.com/docker/cli
       - github.com/moby/moby
