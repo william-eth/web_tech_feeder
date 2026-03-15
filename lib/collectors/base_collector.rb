@@ -13,7 +13,7 @@ module WebTechFeeder
     # Abstract base class for all data collectors.
     # Provides shared Faraday HTTP client, error handling, and retry logic.
     class BaseCollector
-      Item = Struct.new(:title, :url, :published_at, :body, :source, keyword_init: true)
+      Item = Struct.new(:title, :url, :published_at, :body, :source, :metadata, keyword_init: true)
 
       attr_reader :config, :logger
 
@@ -81,8 +81,8 @@ module WebTechFeeder
       def cid_tag
         Utils::LogContext.tag(
           run_id: (config.respond_to?(:run_id) ? config.run_id : nil),
-          show_cid: (config.respond_to?(:verbose_cid_logs?) && config.verbose_cid_logs?),
-          show_thread: (config.respond_to?(:verbose_thread_logs?) && config.verbose_thread_logs?)
+          show_cid: config.respond_to?(:verbose_cid_logs?) && config.verbose_cid_logs?,
+          show_thread: config.respond_to?(:verbose_thread_logs?) && config.verbose_thread_logs?
         )
       end
 
@@ -104,7 +104,7 @@ module WebTechFeeder
       end
 
       # Order-preserving parallel map helper for I/O-heavy repo collection.
-      def parallel_map(items, max_threads:)
+      def parallel_map(items, max_threads:, &)
         normalized_threads = [max_threads.to_i, 1].max
         use_parallel = config.respond_to?(:collect_parallel?) &&
                        config.collect_parallel? &&
@@ -115,8 +115,8 @@ module WebTechFeeder
           items,
           max_threads: normalized_threads,
           parallel: use_parallel,
-          logger: logger
-        ) { |item| yield(item) }
+          logger: logger, &
+        )
       end
     end
   end

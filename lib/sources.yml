@@ -12,13 +12,62 @@ section_file_filters:
     - '(^|/)(gemfile|rakefile|puma|sidekiq)'
   devops:
     - '(^|/)\.github/workflows(/|$)'
-    - '(^|/)(infra|infrastructure|ops|deploy|deployment|k8s|kubernetes|helm|terraform|ansible)(/|$)'
+    - '(^|/)(infra|infrastructure|ops|deploy|deployment|k8s|kubernetes|helm|ansible)(/|$)'
     - '(^|/)(docker|compose|container)(/|$)'
     - '(^|/)(ci|cd|pipeline)(/|$)'
     - '(^|/)(chart|manifests?)(/|$)'
     - '(^|/)Dockerfile'
 
 frontend:
+  # Primary sources: curated articles and blog posts for React ecosystem developers
+  api_feeds:
+    - name: Dev.to React Tag
+      url: "https://dev.to/api/articles?tag=react&top=7"
+    - name: Dev.to WebDev Tag
+      url: "https://dev.to/api/articles?tag=webdev&top=7"
+
+  rss_feeds:
+    # Primary curated sources (high-quality blog/tutorial content)
+    - url: "https://tkdodo.eu/blog/rss.xml"
+      name: TkDodo's Blog
+      primary: true
+    - url: "https://www.joshwcomeau.com/rss.xml"
+      name: Josh W. Comeau
+      primary: true
+    - url: "https://react.dev/rss.xml"
+      name: React Official
+      primary: true
+    - url: "https://frontendfoc.us/rss/"
+      name: Frontend Focus
+      primary: true
+    # Security feed
+    - url: https://nodejs.org/en/feed/vulnerability.xml
+      name: Node.js Security Advisories
+
+  # Evergreen keywords: articles matching any keyword are treated as high-value
+  evergreen_keywords:
+    architecture_and_data:
+      - "state management"
+      - "data fetching"
+      - "rendering"
+      - "hydration"
+    performance_and_core:
+      - "performance"
+      - "reactivity"
+      - "memoization"
+      - "bundle size"
+    modern_ui_and_web:
+      - "css architecture"
+      - "web api"
+      - "accessibility"
+      - "animation"
+    dx_and_ai:
+      - "developer experience"
+      - "build tool"
+      - "ai driven"
+      - "llm integration"
+
+  # Secondary sources: releases and issues for version tracking
   github_releases:
     - owner: nodejs
       repo: node
@@ -37,7 +86,6 @@ frontend:
       repo: next.js
       name: Next.js
 
-  # Track notable issues and PRs from key repos
   github_issues:
     - owner: nodejs
       repo: node
@@ -52,24 +100,10 @@ frontend:
       repo: next.js
       name: Next.js
 
-  rss_feeds:
-    - url: https://nodejs.org/en/feed/blog.xml
-      name: Node.js Blog
-    # Official Node.js security vulnerability advisories
-    - url: https://nodejs.org/en/feed/vulnerability.xml
-      name: Node.js Security Advisories
-    - url: https://javascriptweekly.com/rss/
-      name: JavaScript Weekly
-    - url: https://nodeweekly.com/rss/
-      name: Node Weekly
-
   github_advisories:
     ecosystem: npm
     packages: [node, react, next, typescript]
 
-  # Repo-level advisories complement ecosystem advisories.
-  # Keep this list small: only repos with active/security-relevant advisories
-  # that are not reliably captured via ecosystem package filters.
   github_repo_advisories:
     - owner: facebook
       repo: react
@@ -239,9 +273,6 @@ devops:
       repo: kubernetes
       name: Kubernetes
       release_notes_path_template: "CHANGELOG/CHANGELOG-%{major}.%{minor}.md"
-    - owner: hashicorp
-      repo: terraform
-      name: Terraform
     - owner: opentofu
       repo: opentofu
       name: OpenTofu
@@ -274,9 +305,6 @@ devops:
     - owner: kubernetes
       repo: kubernetes
       name: Kubernetes
-    - owner: hashicorp
-      repo: terraform
-      name: Terraform
     - owner: opentofu
       repo: opentofu
       name: OpenTofu
@@ -294,9 +322,6 @@ devops:
     # Official Kubernetes CVE feed (Kubernetes Security Response Committee)
     - url: https://kubernetes.io/docs/reference/issues-security/official-cve-feed/feed.xml
       name: Kubernetes Official CVE Feed
-    # HashiCorp security bulletins (Terraform, Vault, Consul, Nomad, etc.)
-    - url: https://discuss.hashicorp.com/c/security/52.rss
-      name: HashiCorp Security Bulletins
     - url: https://aws.amazon.com/blogs/aws/feed/
       name: AWS News Blog
     - url: https://aws.amazon.com/blogs/security/feed/
@@ -310,7 +335,6 @@ devops:
       - github.com/containerd/containerd
       - github.com/opencontainers/runc
       - k8s.io/kubernetes
-      - github.com/hashicorp/terraform
       - github.com/opentofu/opentofu
       - github.com/docker/cli
       - github.com/moby/moby

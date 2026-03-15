@@ -22,7 +22,7 @@ module WebTechFeeder
 
       def collect
         logger.info("Fetching GitHub security advisories for ecosystem: #{@ecosystem}" \
-                    "#{@packages&.any? ? " (packages: #{@packages.join(', ')})" : ''}")
+                    "#{" (packages: #{@packages.join(', ')})" if @packages&.any?}")
 
         advisories = fetch_with_retry
         return [] if advisories.nil?
@@ -38,7 +38,8 @@ module WebTechFeeder
             url: advisory["html_url"],
             published_at: published_at,
             body: truncate_body(advisory["description"] || ""),
-            source: "GitHub Advisory - #{@ecosystem}"
+            source: "GitHub Advisory - #{@ecosystem}",
+            metadata: extract_advisory_metadata(advisory)
           )
         end
 
@@ -77,6 +78,27 @@ module WebTechFeeder
 
         response = conn.get("/advisories", params)
         JSON.parse(response.body)
+      end
+
+      def extract_advisory_metadata(advisory)
+        cvss = advisory.dig("cvss", "score")
+        severity = advisory["severity"]
+        cve_id = advisory["cve_id"]
+
+        vulns = Array(advisory["vulnerabilities"]).map do |v|
+          pkg = v.dig("package", "name")
+          {
+            package: pkg,
+            vulnerable_range: v["vulnerable_version_range"],
+            patched_version: v.dig("first_patched_version", "identifier")
+          }.compact
+        end.reject(&:empty?)
+
+        meta = { severity: severity }
+        meta[:cvss_score] = cvss if cvss
+        meta[:cve_id] = cve_id if cve_id
+        meta[:vulnerabilities] = vulns if vulns.any?
+        meta
       end
 
       def github_headers

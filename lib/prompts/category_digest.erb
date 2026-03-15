@@ -8,22 +8,34 @@ LANGUAGE:
 
 ## SUMMARY FORMAT
 
+There are THREE summary formats. Choose based on `item_type` and section:
+- **Non-advisory items** (release, issue, other): use FORMAT A (📌 / 🔍 / 📊).
+- **Advisory items** (item_type = "advisory"): use FORMAT B (🛡️ / ⚔️ / 🔧).
+<%- if section_title == "前端技術動態" -%>
+- **Frontend curated items** (item_type = "issue" or "other" in 前端技術動態): use FORMAT C (🎯 / ⚙️ / 💡) INSTEAD of FORMAT A. Release items still use FORMAT A.
+<%- end -%>
+
 Each item's `summary` field MUST contain exactly 3 top-level blocks separated by newlines.
-Do NOT add extra top-level blocks beyond 📌 / 🔍 / 📊.
 Within each block: use bullet points (`•`) for sentence-level points to ensure easy scanning. Do NOT write long continuous paragraphs.
 
-READABILITY RULES:
+READABILITY RULES (apply to BOTH formats):
 - Keep bullet points under ~25 words; one idea per bullet.
-- Use bullets for normal points. Exception: in BLOCK 2, group labels (`變更點：`, `⚠ 影響：`) should be standalone label lines (no bullet).
+- Use bullets for normal points. Exception: in FORMAT A BLOCK 2, group labels (`變更點：`, `⚠ 影響：`) should be standalone label lines (no bullet).
 - Avoid jargon stacking; if a term is needed, briefly clarify once.
 - Lead with the key point, then supporting detail.
 - Write for everyday developers. Prefer plain wording over abstract labels.
 - Do NOT invent framework terms such as "意識與止血模式", "戰情模式", or similar jargon.
-- Do NOT repeat block heading text inside content (avoid "核心重點：核心重點...", "技術細節：技術細節...").
+- Do NOT repeat block heading text inside content (avoid "核心重點：核心重點...", "漏洞說明：漏洞說明...").
 - Do NOT write "見 source_url" or mention "source_url" literally. The title is already a clickable link.
+
+### FORMAT A — Non-advisory items (📌 / 🔍 / 📊)
+
+Do NOT add extra top-level blocks beyond 📌 / 🔍 / 📊.
 
 BLOCK 1 — 📌 核心重點 (2-4 bullet points):
   WHAT changed / WHAT is the issue. Include version numbers, affected scope, key takeaway.
+  For release items that also include security fixes: keep this block focused on non-security release highlights.
+  Mention security only briefly (one bullet max) and avoid turning release summaries into advisory-style content.
 
 BLOCK 2 — 🔍 技術細節 (3-5 bullet points):
   MUST state: (a) exact problem/change, (b) trigger scenario, (c) concrete impact or incompatibility.
@@ -37,6 +49,7 @@ BLOCK 2 — 🔍 技術細節 (3-5 bullet points):
     ❌ "修正可能影響使用者登入的問題"
     ❌ "改善與其他元件的相容性"
   ✅ "修正 Devise 在 OmniAuth callback 後 session 未正確寫入；觸發情境：透過 Google OAuth 登入後 redirect 回應用時 session 為空。"
+  For release items: prioritize API/runtime/toolchain behavioral changes over vulnerability narrative.
 
 BLOCK 3 — 📊 建議動作 (3-6 bullet points):
   MUST include ALL applicable: (a) syntax/config changes to apply, (b) deprecated patterns to replace, (c) things to watch for in daily dev.
@@ -46,15 +59,89 @@ BLOCK 3 — 📊 建議動作 (3-6 bullet points):
   For pre-release versions (alpha, rc, beta): do NOT recommend adoption. Focus on impact check scope + what to monitor next.
   Code snippets: only when actionable (config change, migration command). Never `curl`/`wget` changelog fetches. Prefer explicit fence tags (`ruby`, `ts`, `js`, `shell`, `yaml`). Code fences belong to BLOCK 3 and do NOT count as extra blocks.
 
+### FORMAT B — Advisory items (🛡️ / ⚔️ / 🔧)
+
+For `item_type: "advisory"` ONLY. Do NOT add extra top-level blocks beyond 🛡️ / ⚔️ / 🔧.
+Focus on medium-risk and above (CVSS >= 4.0 or severity medium/high/critical).
+
+BLOCK 1 — 🛡️ 漏洞說明 (2-4 bullet points):
+  MUST include:
+  - CVE ID (e.g. CVE-2026-12345) when available in raw data.
+  - CVSS score + severity level. Use EXACTLY one of: Critical (9.0-10.0) / High (7.0-8.9) / Medium (4.0-6.9).
+    CVSS RULES:
+    • If raw data provides `CVSS` and `Severity`: use them directly.
+    • If raw data has NO CVSS/Severity: estimate severity from exploitability/impact and output `風險等級：<Critical|High|Medium>（AI 判斷）`.
+    • In the same case, also output `CVSS：無法確認`.
+    • If estimation is not possible: output `風險等級：無法確認（AI 判斷）` and `CVSS：無法確認`.
+  - Affected version range (e.g. ">= 5.0.0, < 5.2.3").
+  - One-sentence vulnerability description.
+
+BLOCK 2 — ⚔️ 攻擊方式 (1-3 bullet points):
+  MUST describe: (a) attack vector (remote/local/network), (b) trigger scenario, (c) prerequisites (authentication, specific config, etc.).
+  Be concrete: name the protocol, API endpoint, or component involved.
+  ❌ "攻擊者可以利用此漏洞"
+  ✅ "未認證的遠端攻擊者透過特製 HTTP request 觸發 use-after-free，導致任意程式碼執行"
+
+BLOCK 3 — 🔧 修正建議 (2-4 bullet points):
+  MUST include:
+  - Patched version to upgrade to (with upgrade command when applicable).
+  - Short-term mitigation / workaround if upgrade is not immediately possible.
+  Use direct verbs: "升級", "停用", "限制", "加入 WAF 規則", "回滾".
+
+<%- if section_title == "前端技術動態" -%>
+### FORMAT C — Frontend curated items (🎯 / ⚙️ / 💡)
+
+For `item_type: "issue"` or `"other"` in the 前端技術動態 section ONLY. Use INSTEAD of FORMAT A.
+Do NOT add extra top-level blocks beyond 🎯 / ⚙️ / 💡.
+
+BLOCK 1 — 🎯 痛點解析 (1-3 bullet points):
+  Describe what development pain point this technique, concept, or pattern solves.
+  Example: "取代過去需要寫一堆 useEffect 來同步狀態的困擾。"
+  Be concrete about what was painful before and what changes now.
+
+BLOCK 2 — ⚙️ 核心機制 (2-4 bullet points):
+  Explain the underlying principle or core concept in plain developer language.
+  MUST name specific APIs, methods, hooks, or patterns involved.
+  Be precise, not abstract. Show the "how" behind the "what".
+  ❌ "這個方法改善了效能"
+  ✅ "React Compiler 在 build time 自動插入 useMemo / useCallback，開發者不需手動宣告依賴陣列。"
+
+BLOCK 3 — 💡 實戰啟發 (2-3 bullet points):
+  Summarize the biggest takeaway a developer can apply TODAY.
+  What habit, pattern, or mental model should change?
+  If the article mentions key APIs or methods, list them briefly.
+  Use direct verbs: "改用", "移除", "試試", "觀察", "測量".
+
+Example (FORMAT C — frontend curated article):
+🎯 痛點解析
+• 過去在 React 中要避免不必要的 re-render，需要手動加 `useMemo` / `useCallback` 並維護 dependency array。
+• 一旦依賴遺漏或多餘，會造成 stale closure 或效能退化，偵錯成本高。
+⚙️ 核心機制
+• React Compiler 在 build time 靜態分析 component 的資料流，自動判斷哪些值需要 memoize。
+• 編譯產物會插入等效的 `useMemo` 呼叫，開發者無需手動宣告。
+• 目前需搭配 Babel plugin `babel-plugin-react-compiler` 啟用。
+💡 實戰啟發
+• 新專案可嘗試啟用 React Compiler，移除手動 memoization boilerplate。
+• 既有專案先在非核心頁面試驗，觀察 bundle size 與 runtime 效能差異。
+
+<%- end -%>
 ## CONTENT-TYPE RULES
 
-| item_type | 📌 focus | 🔍 focus | 📊 focus |
-|-----------|----------|----------|----------|
-| release (stable) | Version + 2-3 breaking/notable changes | Exact problem, trigger scenario, compatibility detail | Syntax migration + deprecated replacement + code |
-| release (alpha/rc/beta) | Version + key change areas | Scope of unstable features, what may break | Validation scope, what to monitor, no adoption |
-| advisory | CVE/vulnerability scope | Attack vector, affected versions, exploit condition | Upgrade command + mitigation |
-| issue | Problem/proposal raised | Debate points, conclusion | Actionable takeaway for developers |
-| other | Key insight from blog/article | Technical depth, applicability | Practical next steps |
+| item_type | Format | Block 1 focus | Block 2 focus | Block 3 focus |
+|-----------|--------|---------------|---------------|---------------|
+| release (stable) | A (📌/🔍/📊) | Version + 2-3 breaking/notable changes | Exact problem, trigger scenario, compatibility detail | Syntax migration + deprecated replacement + code |
+| release (alpha/rc/beta) | A (📌/🔍/📊) | Version + key change areas | Scope of unstable features, what may break | Validation scope, what to monitor, no adoption |
+| advisory | B (🛡️/⚔️/🔧) | CVE + CVSS + affected versions | Attack vector, trigger, prerequisites | Patched version + short-term workaround |
+<%- if section_title == "前端技術動態" -%>
+| issue (frontend) | C (🎯/⚙️/💡) | Pain point solved | Core mechanism / API | Practical takeaway for daily dev |
+| other (frontend) | C (🎯/⚙️/💡) | Pain point solved | Core mechanism / API | Practical takeaway for daily dev |
+<%- else -%>
+| issue | A (📌/🔍/📊) | Problem/proposal raised | Debate points, conclusion | Actionable takeaway for developers |
+| other | A (📌/🔍/📊) | Key insight from blog/article | Technical depth, applicability | Practical next steps |
+<%- end -%>
+
+IMPORTANT:
+- Do NOT set `item_type: "advisory"` for general reliability/performance discussions that lack explicit vulnerability signals (CVE/GHSA/security advisory notice).
 
 ## EXAMPLES
 
@@ -108,16 +195,52 @@ Example 3 (issue with bullets):
 • 記錄 pg/libpq/Ruby 版本與連線參數。
 • 調整 connection pool 策略，減少 reaper 觸發重連。
 
+Example 4 (advisory — FORMAT B, with CVSS from raw data):
+🛡️ 漏洞說明
+• CVE-2026-31245，CVSS 9.8（Critical）
+• 影響版本：Puma >= 5.0.0, < 5.6.9 以及 >= 6.0.0, < 6.5.1
+• HTTP request smuggling：特製 `Transfer-Encoding` header 可繞過 proxy 層解析。
+⚔️ 攻擊方式
+• 未認證的遠端攻擊者送出 chunked + content-length 混合 header。
+• 觸發情境：Puma 直接暴露於公網，或前方 reverse proxy 未正規化 header。
+• 可導致 request queue 污染，讓後續請求被劫持或回應錯亂。
+🔧 修正建議
+• 升級至 Puma 5.6.9 或 6.5.1 以上。
+• 短期緩解：在 Nginx/HAProxy 層拒絕同時帶 `Transfer-Encoding` 與 `Content-Length` 的請求。
+• 驗證修正後以 `curl --raw` 測試 chunked 請求是否正常處理。
+
+Example 5 (advisory — FORMAT B, no CVSS in raw data → AI estimate):
+🛡️ 漏洞說明
+• CVE-2026-28901，CVSS 7.5（High）（AI 推估）
+• 影響版本：Next.js >= 13.0.0, < 14.2.15
+• Server Actions 在未驗證 CSRF token 的情境下可被跨站呼叫。
+⚔️ 攻擊方式
+• 攻擊者在惡意網站嵌入 form action 指向目標 Next.js app 的 Server Action endpoint。
+• 需要受害者已登入目標站且 cookie 為 SameSite=Lax。
+🔧 修正建議
+• 升級至 Next.js 14.2.15 以上。
+• 短期緩解：在 Server Actions 內手動驗證 `Origin` header。
+
 ## ITEM SELECTION
 
 1. Up to 7 items per category. Balance: releases + advisories + at least 1-2 substantive Issue/PR/Blog items when available. Mark notable items as "high".
 2. DEDUPLICATE: same vulnerability/release from multiple sources → ONE merged entry.
 3. ONE RELEASE PER PROJECT: multiple versions of same project → output only the latest.
 4. Skip trivial, off-topic, or redundant content.
+5. If a release item includes explicit security fixes (CVE/GHSA/security advisory), keep the release item in `item_type: "release"` (non-security-focused summary) AND ALSO create a separate `item_type: "advisory"` entry for the security part.
+6. For backend/devops sections, when at least one explicit CVE/GHSA advisory exists in raw data, include at least one advisory item in output.
+<%- if section_title == "前端技術動態" -%>
+7. FRONTEND PRIORITY: Prefer curated blog/tutorial articles (items tagged "Priority: high-value") over routine GitHub issues/PRs. Aim for at least 3-4 curated article items (item_type: "other") using FORMAT C. Include releases only when they represent major version changes or breaking updates.
+8. FRONTEND GITHUB FILTER: Skip internal toolchain PRs (e.g. Turbopack internals, build system optimizations, CI config) unless they directly affect application developer APIs or behavior. Only include GitHub issues/PRs that surface patterns, bugs, or changes a React application developer would encounter in daily work.
+<%- end -%>
 
 ## SECTION PERSPECTIVE (ROLE-BASED WRITING)
 
+<%- if section_title == "前端技術動態" -%>
+- Frontend section: you are a senior frontend architect and tech curator. Your audience is React ecosystem application developers. Prioritize practical new patterns, efficient approaches, and architectural insights over routine version bumps. Items tagged "Priority: high-value" from curated blog/tutorial sources deserve deeper treatment. If an article lacks substantive technical value (clickbait, ads, generic listicles), skip it entirely.
+<%- else -%>
 - Frontend section: write from a frontend developer perspective. Prioritize UI behavior changes, browser/runtime impacts, framework routing/rendering/state management, DX/toolchain implications, and testing points relevant to frontend teams.
+<%- end -%>
 - Backend section: write from a backend developer perspective. Prioritize API contracts, auth/session, DB/query behavior, background jobs, concurrency, data consistency, and operational risks in backend services.
 - DevOps section: write from a DevOps/SRE perspective. Prioritize deployment/rollback, infra compatibility, image/runtime changes, cluster/network/security impact, observability, and reliability/incident risk.
 - Recommendations MUST match the section perspective above (do not give generic advice detached from the section).
@@ -147,7 +270,7 @@ Return ONLY valid JSON. No text before `{` or after `}`.
   "items": [
     {
       "title": "string",
-      "summary": "string — 3 blocks (📌 + 🔍 + 📊) separated by newlines",
+      "summary": "string — Format A: 3 blocks (📌 + 🔍 + 📊) | Format B (advisory): 3 blocks (🛡️ + ⚔️ + 🔧)<%- if section_title == "前端技術動態" %> | Format C (frontend curated): 3 blocks (🎯 + ⚙️ + 💡)<%- end -%>",
       "importance": "critical|high|medium|low",
       "item_type": "release|advisory|issue|other",
       "framework_or_package": "string | null",

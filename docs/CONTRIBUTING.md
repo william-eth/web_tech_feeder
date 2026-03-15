@@ -31,7 +31,7 @@ lib/
 | `lib/templates/digest.html.erb` | Email layout, subsections, badges |
 | `lib/services/digest_pipeline.rb` | End-to-end pipeline orchestration |
 | `lib/services/category_collector.rb` | Category/source collection orchestration |
-| `lib/services/digest_filter.rb` | Post-AI filtering and release/other split |
+| `lib/services/digest_filter.rb` | Post-AI filtering and release/security/other split |
 | `.env.example` | Environment variable template |
 | `docs/` | Documentation |
 
@@ -81,12 +81,12 @@ bundle exec ruby bin/generate_digest
 
 ## Modifying Digest Output
 
-- Summary format: `lib/prompts/category_digest.erb`
-- Layout and structure: `lib/templates/digest.html.erb`
-- Filtering logic: `lib/services/digest_filter.rb`
+- Summary format: `lib/prompts/category_digest.erb` (dual-format: 📌/🔍/📊 for general items, 🛡️/⚔️/🔧 for advisories)
+- Layout and structure: `lib/templates/digest.html.erb` (three sub-sections: 版本釋出, 🔒 資安情報, 其他動態)
+- Filtering logic: `lib/services/digest_filter.rb` (splits into release/security/other items)
 - Pipeline orchestration: `lib/services/digest_pipeline.rb`
 - Collection orchestration: `lib/services/category_collector.rb`
-- Shared limits: `lib/digest_limits.rb`
+- Shared limits: `lib/digest_limits.rb` (includes `MAX_SECURITY_PER_CATEGORY`)
 
 ## Related Documentation
 

@@ -40,7 +40,9 @@ flowchart LR
 
 1. **Trigger**: GitHub Actions runs every Monday 08:00 (UTC+8)
 2. **Collect**: Ruby collectors fetch from GitHub Releases, Issues/PRs, RSS, RubyGems, GitHub Advisories
-3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks (📌 Core point / 🔍 Technical details / 📊 Recommended actions); depth is block-specific (typically 2–6 sentences), and Recommended actions supports Action/Awareness modes
+3. **Process**: AI summarizes and categorizes into frontend/backend/devops with structured blocks:
+   - **Non-advisory items**: 📌 Core point / 🔍 Technical details / 📊 Recommended actions
+   - **Advisory items (🔒 資安情報)**: 🛡️ Vulnerability / ⚔️ Attack vector / 🔧 Fix recommendation — with CVSS scores, CVE links, and affected version ranges
 4. **Notify**: HTML email via Gmail API (OAuth 2.0 refresh token); supports dry-run preview to `tmp/digest_preview.html`
 
 ## Data Sources
@@ -59,10 +61,10 @@ flowchart LR
 - **Security**: RubyGems advisories and repository-level advisories (Ruby on Rails)
 
 ### DevOps
-- **Releases**: PostgreSQL (server), Redis (server), Valkey (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, Terraform, OpenTofu, Amazon EKS AMI
+- **Releases**: PostgreSQL (server), Redis (server), Valkey (server), Helm, Grafana, ArgoCD, Docker Engine, Reloader, Docker Ruby, Nginx, GitLab, Kubernetes, OpenTofu, Amazon EKS AMI
 - **Issues/PRs**: Community discussions from above repos
-- **RSS**: Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, HashiCorp Security Bulletins, AWS News, AWS Security, Kubernetes Blog
-- **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, Terraform, OpenTofu, Docker Engine/CLI, Helm, Grafana, ArgoCD) and repository-level advisories (Valkey, PostgreSQL, Redis, Nginx)
+- **RSS**: Amazon EKS Kubernetes Versions (doc updates), GitLab Blog, Kubernetes CVE Feed, AWS News, AWS Security, Kubernetes Blog
+- **Security**: Go ecosystem advisories (containerd, runc, Kubernetes, OpenTofu, Docker Engine/CLI, Helm, Grafana, ArgoCD) and repository-level advisories (Valkey, PostgreSQL, Redis, Nginx)
 
 ## Prerequisites
 

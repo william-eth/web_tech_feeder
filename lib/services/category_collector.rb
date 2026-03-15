@@ -4,6 +4,7 @@ require_relative "../collectors/github_release_collector"
 require_relative "../collectors/github_issue_collector"
 require_relative "../collectors/rss_collector"
 require_relative "../collectors/rubygems_collector"
+require_relative "../collectors/devto_collector"
 require_relative "../collectors/github_advisory_collector"
 require_relative "../utils/parallel_executor"
 
@@ -39,12 +40,15 @@ module WebTechFeeder
 
       def build_source_jobs(category, source_config)
         jobs = []
+        jobs << api_feeds_job(source_config[:api_feeds]) if source_config[:api_feeds]&.any?
         jobs << github_releases_job(category, source_config[:github_releases]) if source_config[:github_releases]&.any?
         jobs << github_issues_job(category, source_config[:github_issues]) if source_config[:github_issues]&.any?
         jobs << rss_feeds_job(category, source_config[:rss_feeds]) if source_config[:rss_feeds]&.any?
         jobs << rubygems_job(source_config[:rubygems]) if source_config[:rubygems]&.any?
         jobs << github_advisories_job(source_config[:github_advisories]) if source_config[:github_advisories]
-        jobs << github_repo_advisories_job(source_config[:github_repo_advisories]) if source_config[:github_repo_advisories]&.any?
+        if source_config[:github_repo_advisories]&.any?
+          jobs << github_repo_advisories_job(source_config[:github_repo_advisories])
+        end
         jobs
       end
 
@@ -85,6 +89,16 @@ module WebTechFeeder
               feeds: feeds,
               section_key: category
             )
+            collector.collect
+          }
+        }
+      end
+
+      def api_feeds_job(feeds)
+        {
+          name: "api_feeds",
+          call: lambda {
+            collector = Collectors::DevtoCollector.new(@config, feeds: feeds)
             collector.collect
           }
         }

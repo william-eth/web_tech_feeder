@@ -39,7 +39,8 @@ module WebTechFeeder
               url: advisory["html_url"],
               published_at: published_at,
               body: truncate_body(advisory["description"] || ""),
-              source: "GitHub Advisory - #{name}"
+              source: "GitHub Advisory - #{name}",
+              metadata: extract_advisory_metadata(advisory)
             )
           end
         end
@@ -75,11 +76,32 @@ module WebTechFeeder
         }
 
         response = conn.get("/repos/#{owner}/#{repo}/security-advisories", params)
-        
+
         # If the repository doesn't have security advisories enabled, it returns 404
         return [] if response.status == 404
-        
+
         JSON.parse(response.body)
+      end
+
+      def extract_advisory_metadata(advisory)
+        cvss = advisory.dig("cvss", "score")
+        severity = advisory["severity"]
+        cve_id = advisory["cve_id"]
+
+        vulns = Array(advisory["vulnerabilities"]).map do |v|
+          pkg = v.dig("package", "name")
+          {
+            package: pkg,
+            vulnerable_range: v["vulnerable_version_range"],
+            patched_version: v.dig("first_patched_version", "identifier")
+          }.compact
+        end.reject(&:empty?)
+
+        meta = { severity: severity }
+        meta[:cvss_score] = cvss if cvss
+        meta[:cve_id] = cve_id if cve_id
+        meta[:vulnerabilities] = vulns if vulns.any?
+        meta
       end
 
       def github_headers

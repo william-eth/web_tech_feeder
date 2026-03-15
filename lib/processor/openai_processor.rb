@@ -48,9 +48,7 @@ module WebTechFeeder
 
         parsed = JSON.parse(response.body)
 
-        if parsed["error"]
-          raise "API error: #{parsed['error']['message'] || parsed['error']}"
-        end
+        raise "API error: #{parsed['error']['message'] || parsed['error']}" if parsed["error"]
 
         choice = parsed.dig("choices", 0)
         text = choice&.dig("message", "content")

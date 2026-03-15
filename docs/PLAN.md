@@ -87,7 +87,7 @@ Use a two-layer security source strategy for DevOps:
 
 ### Rationale
 
-- Common DevOps tools (Kubernetes, Terraform, containerd, Docker CLI, Helm, Grafana, ArgoCD) are written in Go
+- Common DevOps tools (Kubernetes, OpenTofu, containerd, Docker CLI, Helm, Grafana, ArgoCD) are written in Go
 - GitHub Advisory Database supports Go ecosystem filtering by module path
 - Some infrastructure/server projects publish advisories at repository level and are not reliably covered by ecosystem package filters
 
@@ -99,7 +99,6 @@ packages:
   - github.com/containerd/containerd
   - github.com/opencontainers/runc
   - k8s.io/kubernetes
-  - github.com/hashicorp/terraform
   - github.com/opentofu/opentofu
   - github.com/docker/cli
   - github.com/moby/moby
@@ -346,9 +345,79 @@ Extract pipeline log rendering into a reusable formatter and reduce repetitive r
 
 ---
 
+## 16. Security Advisory Fallback & Enrichment
+
+### Decision
+
+Treat security coverage as a layered pipeline, not a single AI-output dependency.
+
+### Rationale
+
+- AI summaries can occasionally miss explicit CVE/GHSA items
+- Release/news entries can contain critical security fixes that still need dedicated advisory cards
+- CVSS quality varies by upstream source; using multiple trusted feeds improves reliability
+
+### Implementation
+
+- **Processor guardrail (`BaseProcessor`)**:
+  - Prioritize CVE/GHSA items before prompt truncation
+  - If AI output lacks a qualified advisory item, inject one from high-signal raw items
+  - Build advisory summaries with structured blocks (🛡️/⚔️/🔧)
+- **Filter safety net (`DigestFilter`)**:
+  - If no advisory survives upstream, synthesize advisory entries from explicit CVE/GHSA items
+  - Keep release/security/other splitting deterministic with dedicated caps and importance thresholds
+- **CVSS enrichment (`Utils::CveEnricher`)**:
+  - Primary source: NVD API 2.0
+  - Fallback source: Amazon Linux Security Center (ALAS)
+  - Preserve source attribution and reuse CVE descriptions when raw body content is template-like or low-signal
+- **Renderer normalization (`TemplateRenderer`)**:
+  - Enforce security block labels and CVSS/risk lines
+  - Link CVE references to `cve.org`
+  - Normalize markdown/bullet formatting for email-client consistency
+
+---
+
+## 17. Frontend React Ecosystem Revamp
+
+### Decision
+
+Restructure the frontend section around React ecosystem new knowledge from curated
+blog/article sources, with GitHub releases as supplementary content.
+
+### Rationale
+
+- The original frontend section was release-heavy (Node.js, TypeScript, React, Next.js
+  releases) with weekly newsletter RSS as supplementary. This provided version tracking
+  but lacked practical insight for React application developers.
+- Curated technical blogs (TkDodo, Josh W. Comeau, React Official) and Dev.to trending
+  articles provide higher-signal content about modern patterns, performance, and DX.
+- A dedicated summary format (pain point / core mechanism / practical takeaway) better
+  serves developers who want actionable knowledge rather than version diffs.
+
+### Implementation
+
+- **Source layer**:
+  - Primary: Dev.to API (`DevtoCollector`) + curated RSS feeds (marked `primary: true`)
+  - Secondary: GitHub releases/issues (kept for version tracking + security coverage)
+  - Evergreen keyword pools in `sources.yml` for soft relevance boosting
+- **Processor layer** (`BaseProcessor`):
+  - Keyword matching tags items as high-value via `metadata[:keyword_match]`
+  - `prioritize_keyword_items` sorts primary/keyword items before truncation
+  - `format_items` outputs `Priority: high-value` line for AI awareness
+- **Prompt layer** (`category_digest.erb`):
+  - Frontend-specific persona: senior frontend architect / tech curator
+  - FORMAT C (🎯 痛點解析 / ⚙️ 核心機制 / 💡 實戰啟發) for issue/other items
+  - Release items keep FORMAT A; advisory items keep FORMAT B
+  - Item selection rule prioritizes 3-4 curated articles over routine GitHub items
+- **Rendering layer**:
+  - Frontend subsections: 本週精選 (primary) → 版本釋出 → 🔒 資安情報
+  - `TemplateRenderer#summary_parts` recognizes all three icon sets via unified map
+
+---
+
 ## Future Considerations
 
 - [ ] Support more AI models or providers
-- [ ] Configurable digest filters (e.g. by keyword)
+- [x] Configurable digest filters (e.g. by keyword) — implemented via evergreen keywords for frontend
 - [ ] Multi-language output
 - [ ] Digest history archive or web preview

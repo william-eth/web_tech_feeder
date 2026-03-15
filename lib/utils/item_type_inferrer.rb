@@ -21,6 +21,7 @@ module WebTechFeeder
         if item.is_a?(Hash)
           keys.each do |key|
             return item[key].to_s if item.key?(key)
+
             str_key = key.to_s
             return item[str_key].to_s if item.key?(str_key)
           end

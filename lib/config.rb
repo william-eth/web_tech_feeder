@@ -2,7 +2,6 @@
 
 require "yaml"
 require "logger"
-require "thread"
 require_relative "utils/log_context"
 
 module WebTechFeeder
@@ -86,7 +85,7 @@ module WebTechFeeder
     end
 
     def email_bcc
-      ENV["EMAIL_BCC"]
+      ENV.fetch("EMAIL_BCC", nil)
     end
 
     # Dry-run mode: collect + process but skip email sending,
@@ -158,6 +157,16 @@ module WebTechFeeder
     def max_repo_threads
       default = github_token_present? ? 3 : 2
       parse_positive_int(ENV.fetch("MAX_REPO_THREADS", default.to_s), default)
+    end
+
+    # Flattened list of evergreen keywords for a given category.
+    # Returns an empty array when the category has no keywords configured.
+    def evergreen_keywords(category)
+      cat_config = @sources[category.to_sym] || {}
+      kw_groups = cat_config[:evergreen_keywords]
+      return [] unless kw_groups.is_a?(Hash)
+
+      kw_groups.values.flatten.compact.map { |k| k.to_s.downcase }
     end
 
     # Section-aware file path filters used by compare blocks.
@@ -234,6 +243,5 @@ module WebTechFeeder
     def github_token_present?
       !github_token.to_s.strip.empty?
     end
-
   end
 end

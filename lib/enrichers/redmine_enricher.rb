@@ -49,7 +49,7 @@ module WebTechFeeder
           nil
         end
 
-        def format_issue_and_journals(data, logger)
+        def format_issue_and_journals(data, _logger)
           issue = data["issue"] || data
           journals = data["journals"] || issue["journals"] || []
 
@@ -59,7 +59,7 @@ module WebTechFeeder
           parts << "Description:\n#{desc}" if desc && !desc.empty?
 
           # Journals (comments/discussion)
-          comment_entries = journals.select { |j| j["notes"].to_s.strip != "" }
+          comment_entries = journals.reject { |j| j["notes"].to_s.strip.empty? }
           if comment_entries.any?
             parts << "Discussion (#{comment_entries.size} entries):"
             comment_entries.each do |j|
