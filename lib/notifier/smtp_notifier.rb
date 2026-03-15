@@ -148,32 +148,38 @@ module WebTechFeeder
       end
 
       # Split summary into structured parts.
-      # Supports two formats:
+      # Supports three formats:
       #   Format A (non-advisory): 📌 核心重點 / 🔍 技術細節 / 📊 建議動作
       #   Format B (advisory):     🛡️ 漏洞說明 / ⚔️ 攻擊方式 / 🔧 修正建議
+      #   Format C (frontend):     🎯 痛點解析 / ⚙️ 核心機制 / 💡 實戰啟發
       # Returns array of [label, content]; if no structure detected, returns [[nil, full_summary]]
+      SUMMARY_SPLIT_REGEX = /(?=📌|🔍|📊|🛡️|⚔️|🔧|🎯|⚙️|💡)/
+
+      ICON_LABEL_MAP = {
+        "📌" => ["📌 核心重點", "核心重點"],
+        "🔍" => ["🔍 技術細節", "技術細節"],
+        "📊" => ["📊 建議動作", "建議動作"],
+        "🛡️" => ["🛡️ 漏洞說明", "漏洞說明"],
+        "⚔️" => ["⚔️ 攻擊方式", "攻擊方式"],
+        "🔧" => ["🔧 修正建議", "修正建議"],
+        "🎯" => ["🎯 痛點解析", "痛點解析"],
+        "⚙️" => ["⚙️ 核心機制", "核心機制"],
+        "💡" => ["💡 實戰啟發", "實戰啟發"]
+      }.freeze
+
       def summary_parts(summary)
         text = summary.to_s.strip
         return [[nil, ""]] if text.empty?
 
-        parts = text.split(/(?=📌|🔍|📊|🛡️|⚔️|🔧)/).map(&:strip).reject(&:empty?)
+        parts = text.split(SUMMARY_SPLIT_REGEX).map(&:strip).reject(&:empty?)
         return [[nil, text]] if parts.empty?
 
-        structured = parts.map do |p|
-          if p.start_with?("📌")
-            ["📌 核心重點", normalize_block_content(p, icon: "📌", heading: "核心重點")]
-          elsif p.start_with?("🔍")
-            ["🔍 技術細節", normalize_block_content(p, icon: "🔍", heading: "技術細節")]
-          elsif p.start_with?("📊")
-            ["📊 建議動作", normalize_block_content(p, icon: "📊", heading: "建議動作")]
-          elsif p.start_with?("🛡️")
-            ["🛡️ 漏洞說明", normalize_block_content(p, icon: "🛡️", heading: "漏洞說明")]
-          elsif p.start_with?("⚔️")
-            ["⚔️ 攻擊方式", normalize_block_content(p, icon: "⚔️", heading: "攻擊方式")]
-          elsif p.start_with?("🔧")
-            ["🔧 修正建議", normalize_block_content(p, icon: "🔧", heading: "修正建議")]
-          end
-        end.compact
+        structured = parts.filter_map do |p|
+          icon, mapping = ICON_LABEL_MAP.find { |ic, _| p.start_with?(ic) }
+          next unless mapping
+
+          [mapping[0], normalize_block_content(p, icon: icon, heading: mapping[1])]
+        end
 
         structured.any? ? structured : [[nil, text]]
       end

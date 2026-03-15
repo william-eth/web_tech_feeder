@@ -82,7 +82,9 @@ module WebTechFeeder
       private
 
       def process_category(category, items)
-        limited = prioritize_security_items(items).take(ITEMS_LIMIT_FOR_AI)
+        prioritized = prioritize_security_items(items)
+        prioritized = prioritize_keyword_items(category, prioritized)
+        limited = prioritized.take(ITEMS_LIMIT_FOR_AI)
         prompt = build_category_prompt(category, limited)
         retries = 0
         begin
@@ -115,6 +117,35 @@ module WebTechFeeder
         sec + rest
       end
 
+      # For categories with evergreen keywords (e.g. frontend), boost items
+      # from primary sources or matching keywords so they survive truncation.
+      # Items already prioritized by security stay at the front.
+      def prioritize_keyword_items(category, items)
+        keywords = config.evergreen_keywords(category)
+        return items if keywords.empty?
+
+        items.each do |item|
+          next unless item.respond_to?(:metadata)
+
+          item.metadata ||= {}
+          text = "#{item.title} #{item.body}".downcase
+          item.metadata[:keyword_match] = keywords.any? { |kw| text.include?(kw) }
+          item.metadata[:primary_source] = true if item.metadata[:primary_source]
+        end
+
+        high_value, rest = items.partition { |i| keyword_high_value?(i) }
+        sec_items, non_sec_high = high_value.partition { |i| Utils::SecuritySignal.explicit_security_id_signal?(i.title) }
+        sec_rest, normal_rest = rest.partition { |i| Utils::SecuritySignal.explicit_security_id_signal?(i.title) }
+        sec_items + sec_rest + non_sec_high + normal_rest
+      end
+
+      def keyword_high_value?(item)
+        meta = item.respond_to?(:metadata) ? item.metadata : nil
+        return false unless meta.is_a?(Hash)
+
+        meta[:keyword_match] || meta[:primary_source]
+      end
+
       PROMPT_TEMPLATE_PATH = File.expand_path("../prompts/category_digest.erb", __dir__)
 
       def build_category_prompt(category, items)
@@ -138,6 +169,7 @@ module WebTechFeeder
           lines << "  URL: #{item.url}"
           lines << "  Published: #{item.published_at}"
           lines << "  Source: #{item.source}"
+          lines << "  Priority: high-value" if keyword_high_value?(item)
           body = item.body.to_s.strip
           if body.length.positive?
             truncated = Utils::TextTruncator.truncate(body, max_length: BODY_TRUNCATE)

@@ -377,9 +377,47 @@ Treat security coverage as a layered pipeline, not a single AI-output dependency
 
 ---
 
+## 17. Frontend React Ecosystem Revamp
+
+### Decision
+
+Restructure the frontend section around React ecosystem new knowledge from curated
+blog/article sources, with GitHub releases as supplementary content.
+
+### Rationale
+
+- The original frontend section was release-heavy (Node.js, TypeScript, React, Next.js
+  releases) with weekly newsletter RSS as supplementary. This provided version tracking
+  but lacked practical insight for React application developers.
+- Curated technical blogs (TkDodo, Josh W. Comeau, React Official) and Dev.to trending
+  articles provide higher-signal content about modern patterns, performance, and DX.
+- A dedicated summary format (pain point / core mechanism / practical takeaway) better
+  serves developers who want actionable knowledge rather than version diffs.
+
+### Implementation
+
+- **Source layer**:
+  - Primary: Dev.to API (`DevtoCollector`) + curated RSS feeds (marked `primary: true`)
+  - Secondary: GitHub releases/issues (kept for version tracking + security coverage)
+  - Evergreen keyword pools in `sources.yml` for soft relevance boosting
+- **Processor layer** (`BaseProcessor`):
+  - Keyword matching tags items as high-value via `metadata[:keyword_match]`
+  - `prioritize_keyword_items` sorts primary/keyword items before truncation
+  - `format_items` outputs `Priority: high-value` line for AI awareness
+- **Prompt layer** (`category_digest.erb`):
+  - Frontend-specific persona: senior frontend architect / tech curator
+  - FORMAT C (🎯 痛點解析 / ⚙️ 核心機制 / 💡 實戰啟發) for issue/other items
+  - Release items keep FORMAT A; advisory items keep FORMAT B
+  - Item selection rule prioritizes 3-4 curated articles over routine GitHub items
+- **Rendering layer**:
+  - Frontend subsections: 本週精選 (primary) → 版本釋出 → 🔒 資安情報
+  - `TemplateRenderer#summary_parts` recognizes all three icon sets via unified map
+
+---
+
 ## Future Considerations
 
 - [ ] Support more AI models or providers
-- [ ] Configurable digest filters (e.g. by keyword)
+- [x] Configurable digest filters (e.g. by keyword) — implemented via evergreen keywords for frontend
 - [ ] Multi-language output
 - [ ] Digest history archive or web preview

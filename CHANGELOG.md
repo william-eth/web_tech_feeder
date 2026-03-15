@@ -7,9 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.2.0] - 2026-03-13
+## [1.2.0] - 2026-03-16
 
 ### Added
+- **Frontend React ecosystem revamp**: Restructured frontend section to focus on React-specific new knowledge and practical coding insights, with GitHub releases/issues as supplementary content.
+- **Dev.to API collector (`DevtoCollector`)**: New REST API collector fetches curated articles from Dev.to by tag (React, WebDev), with `top=7` quality filtering.
+- **Curated RSS sources for frontend**: Added TkDodo's Blog, Josh W. Comeau, React Official blog, and Frontend Focus as primary content sources; removed JavaScript Weekly and Node Weekly.
+- **Evergreen keyword prioritization**: Configurable keyword pools (architecture/data, performance/core, modern UI/web, DX/AI) boost high-value articles to survive AI truncation.
+- **Frontend summary FORMAT C (🎯/⚙️/💡)**: New three-block structure for curated frontend articles — 痛點解析 (Pain Point) / 核心機制 (Core Mechanism) / 實戰啟發 (Practical Takeaway). Release items keep FORMAT A; advisory items keep FORMAT B.
+- **Frontend-specific AI persona**: Prompt switches to "senior frontend architect and tech curator" perspective for the frontend section, prioritizing practical patterns over routine updates.
+- **Frontend "本週精選" subsection**: Renamed "其他動態" to "本週精選" for frontend, displayed first as primary content, followed by "版本釋出" and "🔒 資安情報".
 - **Security intelligence sub-section (🔒 資安情報)**: Added dedicated security block per category (Frontend/Backend/DevOps), displayed alongside "版本釋出" and "其他動態", with empty-state fallback.
 - **Advisory summary format (🛡️/⚔️/🔧)**: Added security-only three-block summary structure and renderer-side label normalization for advisory cards.
 - **Advisory metadata pipeline**: `Item` now supports `metadata`; GitHub advisory collectors pass CVE/CVSS/severity/version-range metadata into AI prompt input.
