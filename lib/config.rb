@@ -228,7 +228,7 @@ module WebTechFeeder
       when Array
         "Array(size=#{value.size})"
       when Hash
-        keys = value.keys.first(3).map(&:to_s).join(",")
+        keys = value.keys.first(3).join(",")
         value.size > 3 ? "Hash(keys=#{keys},...)" : "Hash(keys=#{keys})"
       else
         value.class.to_s

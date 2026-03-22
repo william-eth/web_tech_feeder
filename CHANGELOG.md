@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-03-22
+
+### Fixed
+- **Advisory summary tone**: FORMAT B now forbids first-person English or diary-style upgrade narration (for example, `I upgraded from … due to the security advisory`); renderer-side normalization rewrites this pattern into neutral Traditional Chinese security briefing text.
+- **CVSS severity mismatch normalization**: When upstream/raw data provides contradictory labels such as `CVSS 8.8 (Medium)`, advisory rendering now trusts the numeric score range and normalizes the displayed severity to the correct level.
+- **Preview rendering compatibility**: Updated digest preview generation to use `TemplateRenderer#binding_context`, keeping dry-run preview rendering aligned with the notifier renderer API after the helper rename.
+
+### Changed
+- **Advisory prompt guidance**: Tightened FORMAT B instructions so security summaries must use neutral Traditional Chinese briefing language and must resolve score/label conflicts by trusting the numeric CVSS range.
+- **RuboCop signal-to-noise tuning**: Disabled high-noise complexity/size cops that would force over-fragmented refactors, excluded Markdown/ERB files from Ruby lint parsing, and excluded `lib/notifier/smtp_notifier.rb` from line-length enforcement due to inline CSS/regex-heavy content.
+- **Low-risk style cleanup**: Applied non-behavioral RuboCop cleanups across notifier, processor, collector, and config code paths (`positive?`, `filter_map`, safe navigation simplification, `delete_suffix`, `uniq(&:url)`, `sum(&:size)`, and small hash lookup rewrites).
+
 ## [1.2.0] - 2026-03-16
 
 ### Added
@@ -221,7 +233,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.0...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.1...HEAD
+[1.2.1]: https://github.com/william-eth/web_tech_feeder/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...1.1.0
 [1.0.1]: https://github.com/william-eth/web_tech_feeder/compare/1.0.0...1.0.1

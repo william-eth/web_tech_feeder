@@ -16,6 +16,16 @@ module WebTechFeeder
       MAX_RETRIES = 3
       ITEMS_LIMIT_FOR_AI = 15
       FALLBACK_ITEMS_LIMIT = 5
+      PROMPT_TEMPLATE_PATH = File.expand_path("../prompts/category_digest.erb", __dir__)
+      BODY_TRUNCATE = 800
+      ADVISORY_MIN_IMPORTANCE = %w[critical high medium].freeze
+      SECURITY_DETAILS_UNAVAILABLE = "來源未提供完整漏洞細節。"
+      NVD_SEVERITY_MAP = {
+        "CRITICAL" => "critical",
+        "HIGH" => "high",
+        "MEDIUM" => "medium",
+        "LOW" => "low"
+      }.freeze
 
       CATEGORY_TITLES = {
         frontend: "前端技術動態",
@@ -146,8 +156,6 @@ module WebTechFeeder
         meta[:keyword_match] || meta[:primary_source]
       end
 
-      PROMPT_TEMPLATE_PATH = File.expand_path("../prompts/category_digest.erb", __dir__)
-
       def build_category_prompt(category, items)
         section_title = CATEGORY_TITLES[category]
         raw_data = format_items(items)
@@ -158,9 +166,6 @@ module WebTechFeeder
           raw_data: raw_data
         )
       end
-
-      # Per-item body truncation; enriched items (with comments) may be longer
-      BODY_TRUNCATE = 800
 
       def format_items(items)
         lines = []
@@ -212,9 +217,6 @@ module WebTechFeeder
         parsed[:items].each { |item| normalize_item_type!(item) }
         parsed
       end
-
-      ADVISORY_MIN_IMPORTANCE = %w[critical high medium].freeze
-      SECURITY_DETAILS_UNAVAILABLE = "來源未提供完整漏洞細節。"
 
       def ensure_security_coverage(parsed, raw_items)
         items = Array(parsed[:items])
@@ -289,8 +291,6 @@ module WebTechFeeder
         }
       end
 
-      NVD_SEVERITY_MAP = { "CRITICAL" => "critical", "HIGH" => "high", "MEDIUM" => "medium", "LOW" => "low" }.freeze
-
       def nvd_severity_to_importance(severity)
         NVD_SEVERITY_MAP[severity.to_s.upcase] || "high"
       end
@@ -298,9 +298,7 @@ module WebTechFeeder
       def advisory_summary_from_raw(item, cve, cvss: nil)
         desc = extract_security_description(item.body.to_s)
         # Prefer CVE description from enricher over low-quality raw body extraction
-        if cvss&.dig(:description) && (desc == SECURITY_DETAILS_UNAVAILABLE || github_template_body?(item.body.to_s))
-          desc = cvss[:description]
-        end
+        desc = cvss[:description] if cvss&.dig(:description) && (desc == SECURITY_DETAILS_UNAVAILABLE || github_template_body?(item.body.to_s))
 
         vuln_lines = ["🛡️ 漏洞說明"]
         if cvss
@@ -366,10 +364,8 @@ module WebTechFeeder
           next unless line.length >= 20 && Utils::SecuritySignal.vulnerability_keyword_signal?(line)
 
           explanation = line
-          header_candidate = lines[i - 1] if i > 0
-          if header_candidate && header_candidate.length < 120 && !header_candidate.match?(/\.\s*\z/)
-            header = header_candidate
-          end
+          header_candidate = lines[i - 1] if i.positive?
+          header = header_candidate if header_candidate && header_candidate.length < 120 && !header_candidate.match?(/\.\s*\z/)
           break
         end
 
@@ -501,7 +497,7 @@ module WebTechFeeder
             depth += 1
           elsif c == "}"
             depth -= 1
-            return str[start_idx..i] if depth == 0
+            return str[start_idx..i] if depth.zero?
           end
 
           i += 1
@@ -514,7 +510,7 @@ module WebTechFeeder
       def fallback_category(category, items)
         logger.warn("Using fallback for #{category} (#{items.size} items)")
 
-        unique_items = items.uniq { |i| i.url }.sort_by { |i| i.published_at || Time.at(0) }.reverse
+        unique_items = items.uniq(&:url).sort_by { |i| i.published_at || Time.at(0) }.reverse
 
         {
           section_title: CATEGORY_TITLES[category],
@@ -562,7 +558,7 @@ module WebTechFeeder
       end
 
       def count_items(raw_data)
-        raw_data.values.sum { |items| items.size }
+        raw_data.values.sum(&:size)
       end
     end
   end
