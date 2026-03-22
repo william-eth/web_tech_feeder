@@ -101,7 +101,7 @@ module WebTechFeeder
 
         renderer = Notifier::TemplateRenderer.new(digest_data, config)
         template = File.read(Notifier::SmtpNotifier::TEMPLATE_PATH)
-        html = ERB.new(template, trim_mode: "-").result(renderer.get_binding)
+        html = ERB.new(template, trim_mode: "-").result(renderer.binding_context)
 
         preview_dir = File.expand_path("../../tmp", __dir__)
         FileUtils.mkdir_p(preview_dir)
