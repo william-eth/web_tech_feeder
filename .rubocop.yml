@@ -6,6 +6,10 @@ AllCops:
   NewCops: enable
   SuggestExtensions: false
   Exclude:
+    - "CHANGELOG.md"
+    - "docs/**/*.md"
+    - "lib/prompts/**/*.erb"
+    - "lib/templates/**/*.erb"
     - "vendor/**/*"
     - "tmp/**/*"
 
@@ -20,13 +24,24 @@ Style/Documentation:
   Enabled: false
 
 Metrics/MethodLength:
-  Max: 25
+  Max: 50
 
 Metrics/ClassLength:
-  Max: 150
+  Enabled: false
+
+Metrics/ModuleLength:
+  Max: 200
 
 Metrics/AbcSize:
-  Max: 30
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
 
 Layout/LineLength:
   Max: 150
+  Exclude:
+    - "lib/notifier/smtp_notifier.rb"

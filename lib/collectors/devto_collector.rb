@@ -63,7 +63,8 @@ module WebTechFeeder
 
       def build_body(article)
         parts = []
-        parts << article["description"] if article["description"]&.strip&.length&.positive?
+        description = article["description"].to_s.strip
+        parts << description unless description.empty?
         tags = article["tag_list"]
         parts << "Tags: #{tags.join(', ')}" if tags.is_a?(Array) && tags.any?
         parts.join("\n\n")

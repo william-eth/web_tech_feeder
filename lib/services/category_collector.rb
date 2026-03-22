@@ -46,9 +46,7 @@ module WebTechFeeder
         jobs << rss_feeds_job(category, source_config[:rss_feeds]) if source_config[:rss_feeds]&.any?
         jobs << rubygems_job(source_config[:rubygems]) if source_config[:rubygems]&.any?
         jobs << github_advisories_job(source_config[:github_advisories]) if source_config[:github_advisories]
-        if source_config[:github_repo_advisories]&.any?
-          jobs << github_repo_advisories_job(source_config[:github_repo_advisories])
-        end
+        jobs << github_repo_advisories_job(source_config[:github_repo_advisories]) if source_config[:github_repo_advisories]&.any?
         jobs
       end
 
@@ -148,9 +146,7 @@ module WebTechFeeder
         parallel_enabled = @config.collect_parallel? && source_jobs.size > 1 && @config.max_collect_threads > 1
         worker_count = [@config.max_collect_threads, source_jobs.size].min
 
-        if parallel_enabled
-          @logger.info("[collect-parallel] category=#{category} jobs=#{source_jobs.size} workers=#{worker_count}")
-        end
+        @logger.info("[collect-parallel] category=#{category} jobs=#{source_jobs.size} workers=#{worker_count}") if parallel_enabled
 
         Utils::ParallelExecutor.map(
           source_jobs,
@@ -178,7 +174,7 @@ module WebTechFeeder
           title = item.respond_to?(:title) ? item.title.to_s : item[:title].to_s
           source = item.respond_to?(:source) ? item.source.to_s : item[:source].to_s
           url = item.respond_to?(:url) ? item.url.to_s : item[:url].to_s
-          [-(published_at&.to_i || 0), title, source, url]
+          [-(published_at ? published_at.to_i : 0), title, source, url]
         end
       end
 
@@ -230,7 +226,7 @@ module WebTechFeeder
                       end
 
         # Prefer richer bodies and newer timestamps when source rank ties.
-        [source_rank, body.length, published_at&.to_i || 0]
+        [source_rank, body.length, published_at ? published_at.to_i : 0]
       end
     end
   end

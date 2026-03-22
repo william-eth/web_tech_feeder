@@ -94,7 +94,7 @@ module WebTechFeeder
       def render_template(digest_data)
         template = File.read(TEMPLATE_PATH)
         renderer = TemplateRenderer.new(digest_data, config)
-        ERB.new(template, trim_mode: "-").result(renderer.get_binding)
+        ERB.new(template, trim_mode: "-").result(renderer.binding_context)
       end
 
       def build_subject
@@ -134,7 +134,7 @@ module WebTechFeeder
           security = section[:security_items]&.size || 0
           others = section[:other_items]&.size || 0
           total = releases + security + others
-          total > 0 ? total : (section[:items]&.size || 0)
+          total.positive? ? total : (section[:items]&.size || 0)
         end
       end
 
@@ -187,8 +187,8 @@ module WebTechFeeder
       # Enforce security subsection labels as 🛡️ / ⚔️ / 🔧.
       # If upstream summary uses generic 📌 / 🔍 / 📊, map labels while preserving content.
       def security_summary_parts(summary, importance: nil)
-        parts = summary_parts(summary)
-        labels = parts.map(&:first).compact
+        parts = summary_parts(normalize_security_summary(summary))
+        labels = parts.filter_map(&:first)
         normalized = if labels.any? { |label| label.start_with?("🛡️", "⚔️", "🔧") }
                        parts
                      else
@@ -228,10 +228,44 @@ module WebTechFeeder
       end
 
       def inferred_severity_from_importance(importance)
-        case importance.to_s.downcase
-        when "critical" then "Critical"
-        when "high" then "High"
-        when "medium" then "Medium"
+        {
+          "critical" => "Critical",
+          "high" => "High",
+          "medium" => "Medium"
+        }[importance.to_s.downcase]
+      end
+
+      # Normalize recurring security-summary drift from upstream/raw text before rendering.
+      def normalize_security_summary(summary)
+        normalize_cvss_severity_label(sanitize_security_summary_drift(summary))
+      end
+
+      # Neutralize first-person English lines sometimes echoed from raw GitHub/issue text into advisory summaries.
+      def sanitize_security_summary_drift(summary)
+        summary.to_s.gsub(
+          /^[•\s\u2022*-]*(?:I|We)\s+(?:upgraded|migrated|updated)\s+from\s+(.+?)\s+due\s+to\s+the\s+security\s+advisory:?\s*$/im
+        ) do
+          path = Regexp.last_match(1).strip
+          "• 官方建議依安全公告評估升級路徑：#{path}。"
+        end
+      end
+
+      # Upstream advisories occasionally ship inconsistent labels such as
+      # "CVSS 8.8 (Medium)". Trust the numeric score over the text label.
+      def normalize_cvss_severity_label(summary)
+        summary.to_s.gsub(/CVSS(?:\s+Rating:)?\s*(\d+\.\d+)\s*[（(](Critical|High|Medium|Low|Important)[）)]/i) do
+          score = Regexp.last_match(1).to_f
+          label = cvss_severity_from_score(score)
+          "CVSS #{Regexp.last_match(1)}（#{label}）"
+        end
+      end
+
+      def cvss_severity_from_score(score)
+        case score
+        when 9.0..10.0 then "Critical"
+        when 7.0...9.0 then "High"
+        when 4.0...7.0 then "Medium"
+        else "Low"
         end
       end
 
@@ -258,12 +292,12 @@ module WebTechFeeder
         # If we cut inside (#\d+) or #\d+, extend to include the full ref or trim the partial
         rest = cleaned[max_length..]
         if cut =~ /\(#\d*$/
-          cut = if rest && rest.match?(/\A(\d*)\)/)
+          cut = if rest&.match?(/\A(\d*)\)/)
                   "#{cut}#{Regexp.last_match(1)})"
                 else
                   cut.sub(/\(#\d*$/, "")
                 end
-        elsif cut =~ /#\d*$/ && rest && rest.match?(/\A(\d+)/)
+        elsif cut =~ /#\d*$/ && rest&.match?(/\A(\d+)/)
           cut = "#{cut}#{Regexp.last_match(1)}"
         else
           last_space = cut.rindex(" ")
@@ -308,7 +342,7 @@ module WebTechFeeder
 
       # Shorten a URL for display (remove protocol, truncate path)
       def shorten_url(url)
-        short = url.to_s.sub(%r{\Ahttps?://}, "").sub(%r{/\z}, "")
+        short = url.to_s.sub(%r{\Ahttps?://}, "").delete_suffix("/")
         short.length > 50 ? "#{short[0...50]}..." : short
       end
 
@@ -320,9 +354,13 @@ module WebTechFeeder
       def github_repo_base_url(url)
         return nil if url.to_s.strip.empty?
 
-        base = url.to_s.strip.sub(%r{/releases/.*}, "").sub(%r{/issues/.*}, "").sub(%r{/pull/.*}, "").sub(%r{/tree/.*}, "").sub(%r{/blob/.*}, "").sub(
-          %r{/\z}, ""
-        )
+        base = url.to_s.strip
+                  .sub(%r{/releases/.*}, "")
+                  .sub(%r{/issues/.*}, "")
+                  .sub(%r{/pull/.*}, "")
+                  .sub(%r{/tree/.*}, "")
+                  .sub(%r{/blob/.*}, "")
+                  .delete_suffix("/")
         base.match?(%r{\Ahttps?://github\.com/[^/]+/[^/]+}) ? base : nil
       end
 
@@ -619,17 +657,17 @@ module WebTechFeeder
       end
 
       def token_style(type)
-        case type
-        when :comment then "color:#94a3b8;"
-        when :string then "color:#86efac;"
-        when :number then "color:#fca5a5;"
-        when :keyword then "color:#93c5fd;font-weight:600;"
-        when :method then "color:#fcd34d;"
-        when :constant then "color:#c4b5fd;"
-        when :symbol then "color:#f9a8d4;"
-        when :variable then "color:#67e8f9;"
-        when :yaml_key then "color:#fcd34d;font-weight:600;"
-        end
+        {
+          comment: "color:#94a3b8;",
+          string: "color:#86efac;",
+          number: "color:#fca5a5;",
+          keyword: "color:#93c5fd;font-weight:600;",
+          method: "color:#fcd34d;",
+          constant: "color:#c4b5fd;",
+          symbol: "color:#f9a8d4;",
+          variable: "color:#67e8f9;",
+          yaml_key: "color:#fcd34d;font-weight:600;"
+        }[type]
       end
 
       def tokenize_code(code, lang)
@@ -702,7 +740,7 @@ module WebTechFeeder
         end
       end
 
-      def get_binding
+      def binding_context
         binding
       end
 
