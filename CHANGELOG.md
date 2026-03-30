@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-03-30
+
+### Security
+- **json**: Upgrade addresses Ruby JSON format-string injection class issues flagged by dependency scanning (high severity in upstream reporting).
+- **mcp**: Upgrade addresses MCP Ruby SDK session-binding gaps that could allow SSE stream hijacking via session replay (high severity; transitive via **RuboCop** in the `:development` group).
+- **nokogiri**: Upgrade addresses mishandling when canonicalization (`xmlC14NExecute`) return values are not checked (moderate severity).
+- **loofah**: Upgrade addresses improper disallowed-URI detection in `allowed_uri?` (low severity; transitive HTML sanitization stack).
+
+### Dependencies
+- **json**: 2.18.1 → 2.19.3
+- **loofah**: 2.25.0 → 2.25.1
+- **mcp**: 0.8.0 → 0.10.0
+- **nokogiri**: 1.19.0 → 1.19.2 (all platform gems in lockfile)
+
 ## [1.2.1] - 2026-03-22
 
 ### Fixed
@@ -233,7 +247,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.1...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.2...HEAD
+[1.2.2]: https://github.com/william-eth/web_tech_feeder/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/william-eth/web_tech_feeder/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...1.2.0
 [1.1.0]: https://github.com/william-eth/web_tech_feeder/compare/1.0.1...1.1.0
