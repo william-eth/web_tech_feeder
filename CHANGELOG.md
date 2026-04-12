@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.3] - 2026-04-13
+
+### Fixed
+- **Advisory severity/importance synchronization**: Advisory `importance` is now normalized from raw CVSS metadata or parsed CVSS scores before filtering and rendering, so cards like `CVSS 6.5 (Medium)` no longer show a `重大` badge or receive critical-only ordering.
+
+### Documentation
+- Updated `docs/PLAN.md` to reflect that advisory severity normalization now happens in the processor guardrail before filtering/rendering, instead of relying on renderer-only summary normalization.
+
 ## [1.2.2] - 2026-03-30
 
 ### Security
@@ -247,7 +255,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Use `actions/checkout@v5` in GitHub Actions workflow
 
-[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.2...HEAD
+[Unreleased]: https://github.com/william-eth/web_tech_feeder/compare/1.2.3...HEAD
+[1.2.3]: https://github.com/william-eth/web_tech_feeder/compare/1.2.2...1.2.3
 [1.2.2]: https://github.com/william-eth/web_tech_feeder/compare/1.2.1...1.2.2
 [1.2.1]: https://github.com/william-eth/web_tech_feeder/compare/1.2.0...1.2.1
 [1.2.0]: https://github.com/william-eth/web_tech_feeder/compare/1.1.0...1.2.0
