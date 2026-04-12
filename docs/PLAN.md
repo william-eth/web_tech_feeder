@@ -363,6 +363,7 @@ Treat security coverage as a layered pipeline, not a single AI-output dependency
   - Prioritize CVE/GHSA items before prompt truncation
   - If AI output lacks a qualified advisory item, inject one from high-signal raw items
   - Build advisory summaries with structured blocks (🛡️/⚔️/🔧)
+  - Normalize advisory `importance` from raw CVSS metadata or parsed summary CVSS before downstream filtering/rendering
 - **Filter safety net (`DigestFilter`)**:
   - If no advisory survives upstream, synthesize advisory entries from explicit CVE/GHSA items
   - Keep release/security/other splitting deterministic with dedicated caps and importance thresholds

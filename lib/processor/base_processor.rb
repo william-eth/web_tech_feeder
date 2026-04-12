@@ -222,6 +222,8 @@ module WebTechFeeder
         items = Array(parsed[:items])
         return parsed if items.empty?
 
+        normalize_advisory_importance!(items, raw_items)
+
         # Only count an existing advisory as sufficient when it has real
         # security material AND its importance meets the minimum threshold.
         # AI sometimes outputs advisory items with low importance that then
@@ -242,6 +244,81 @@ module WebTechFeeder
         items << build_advisory_item_from_raw(candidate)
         parsed[:items] = items.uniq { |i| [i[:source_url].to_s.strip, (i[:item_type] || "").downcase] }
         parsed
+      end
+
+      def normalize_advisory_importance!(items, raw_items)
+        raw_metadata_by_url = build_raw_metadata_by_url(raw_items)
+
+        items.each do |item|
+          next unless (item[:item_type] || "").downcase == "advisory"
+
+          normalized = normalized_advisory_importance(item, raw_metadata_by_url)
+          item[:importance] = normalized if normalized
+        end
+      end
+
+      def build_raw_metadata_by_url(raw_items)
+        Array(raw_items).each_with_object({}) do |raw_item, lookup|
+          next unless raw_item.respond_to?(:metadata)
+          next unless raw_item.metadata.is_a?(Hash)
+
+          url = raw_item.url.to_s.strip
+          next if url.empty?
+
+          lookup[url] = raw_item.metadata
+        end
+      end
+
+      def normalized_advisory_importance(item, raw_metadata_by_url)
+        score = advisory_cvss_score(item, raw_metadata_by_url)
+        return importance_from_cvss_score(score) if score
+
+        severity = advisory_severity_label(item, raw_metadata_by_url)
+        return importance_from_severity_label(severity) if severity
+
+        nil
+      end
+
+      def advisory_cvss_score(item, raw_metadata_by_url)
+        metadata = advisory_raw_metadata(item, raw_metadata_by_url)
+        raw_score = metadata&.[](:cvss_score) || metadata&.[]("cvss_score")
+        return raw_score.to_f if raw_score
+
+        match = item[:summary].to_s.match(/\bCVSS(?:\s+Rating:)?\s*(\d+(?:\.\d+)?)\b/i)
+        match && match[1].to_f
+      end
+
+      def advisory_severity_label(item, raw_metadata_by_url)
+        metadata = advisory_raw_metadata(item, raw_metadata_by_url)
+        raw_severity = metadata&.[](:severity) || metadata&.[]("severity")
+        return raw_severity if raw_severity.to_s.strip.length.positive?
+
+        summary = item[:summary].to_s
+        summary[/風險等級[:：]\s*(Critical|High|Medium|Low|Important)/i, 1] ||
+          summary[/CVSS(?:\s+Rating:)?\s*\d+(?:\.\d+)?\s*[（(](Critical|High|Medium|Low|Important)[）)]/i, 1]
+      end
+
+      def advisory_raw_metadata(item, raw_metadata_by_url)
+        raw_metadata_by_url[item[:source_url].to_s.strip]
+      end
+
+      def importance_from_cvss_score(score)
+        case score.to_f
+        when 9.0..10.0 then "critical"
+        when 7.0...9.0 then "high"
+        when 4.0...7.0 then "medium"
+        else "low"
+        end
+      end
+
+      def importance_from_severity_label(severity)
+        {
+          "CRITICAL" => "critical",
+          "HIGH" => "high",
+          "IMPORTANT" => "high",
+          "MEDIUM" => "medium",
+          "LOW" => "low"
+        }[severity.to_s.upcase]
       end
 
       # Select the best raw item for advisory fallback injection.
