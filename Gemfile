@@ -5,7 +5,7 @@ source "https://rubygems.org"
 ruby "3.4.8"
 
 # HTTP client
-gem "faraday", "~> 2.0"
+gem "faraday", "~> 2.14"
 gem "faraday-retry", "~> 2.0"
 
 # RSS/Atom feed parsing
